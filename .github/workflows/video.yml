@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: Copyright 2026 Jadyx Project
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: Video decoder gates
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  video:
+    name: video decoder regressions
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install video test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++ pkg-config ffmpeg libavcodec-dev libavformat-dev libavutil-dev
+      - name: Build the project's pinned fmt
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import json
+          import os
+          import urllib.request
+          config = json.loads(Path('cpmfile.json').read_text())['fmt']
+          url = 'https://github.com/fmtlib/fmt/archive/refs/tags/' + config['version'] + '.tar.gz'
+          with urllib.request.urlopen(url, timeout=60) as response:
+              data = response.read()
+          if hashlib.sha512(data).hexdigest() != config['hash']:
+              raise SystemExit('fmt source archive checksum mismatch')
+          (Path(os.environ['RUNNER_TEMP']) / 'video-fmt.tar.gz').write_bytes(data)
+          PY
+          mkdir -p "$RUNNER_TEMP/video-fmt-source"
+          tar -xzf "$RUNNER_TEMP/video-fmt.tar.gz" -C "$RUNNER_TEMP/video-fmt-source" --strip-components=1
+          cmake -S "$RUNNER_TEMP/video-fmt-source" -B "$RUNNER_TEMP/video-fmt-build" \
+            -DCMAKE_BUILD_TYPE=Release -DFMT_DOC=OFF -DFMT_TEST=OFF \
+            -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/video-fmt-prefix"
+          cmake --build "$RUNNER_TEMP/video-fmt-build" --parallel 2
+          cmake --install "$RUNNER_TEMP/video-fmt-build"
+          echo "PKG_CONFIG_PATH=$RUNNER_TEMP/video-fmt-prefix/lib/pkgconfig" >> "$GITHUB_ENV"
+      - name: Decode synthetic H.264, VP8 and VP9 with sanitizers
+        run: python3 tools/xbox/tests/run-video-gates.py --sanitize --output test-results/series-s-video/sanitized.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: video-decoder-gates
+          path: test-results/series-s-video/sanitized.json
+          if-no-files-found: error
+          retention-days: 14

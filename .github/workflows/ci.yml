@@ -42,22 +42,7 @@ jobs:
       - run: python3 tools/xbox/tests/release.py
 
   video:
-    name: video decoder regressions
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-      - name: Install video test dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y g++ pkg-config ffmpeg libavcodec-dev libavformat-dev libavutil-dev libfmt-dev
-      - name: Decode synthetic H.264, VP8 and VP9 with sanitizers
-        run: python3 tools/xbox/tests/run-video-gates.py --sanitize --output test-results/series-s-video/sanitized.json
-      - uses: actions/upload-artifact@v7
-        with:
-          name: video-decoder-gates
-          path: test-results/series-s-video/sanitized.json
-          if-no-files-found: error
-          retention-days: 14
+    uses: ./.github/workflows/video.yml
 
   build:
     uses: ./.github/workflows/build.yml
