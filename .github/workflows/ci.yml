@@ -21,6 +21,10 @@ on:
         description: Test package version (MAJOR.MINOR.BUILD.REVISION); empty keeps the manifest's
         type: string
         default: ""
+      reuse_build_run:
+        description: Repackage a successful CI run without compiling (empty builds current code)
+        type: string
+        default: ""
       lto:
         description: Enable the host link-time optimization used by releases
         type: boolean
@@ -35,6 +39,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -42,6 +47,7 @@ concurrency:
 
 jobs:
   scripts:
+    if: github.event_name != 'workflow_dispatch' || inputs.reuse_build_run == ''
     name: release scripts
     runs-on: ubuntu-24.04
     steps:
@@ -49,13 +55,24 @@ jobs:
       - run: python3 tools/xbox/tests/release.py
 
   video:
+    if: github.event_name != 'workflow_dispatch' || inputs.reuse_build_run == ''
     uses: ./.github/workflows/video.yml
 
   build:
+    if: github.event_name != 'workflow_dispatch' || inputs.reuse_build_run == ''
     uses: ./.github/workflows/build.yml
     with:
       package: ${{ github.event_name == 'workflow_dispatch' && inputs.package }}
       package_version: ${{ github.event_name == 'workflow_dispatch' && inputs.package_version || '' }}
       lto: ${{ github.event_name == 'workflow_dispatch' && inputs.lto }}
       windows_runner: ${{ github.event_name == 'workflow_dispatch' && inputs.windows_runner || 'windows-2025' }}
+    secrets: inherit
+
+  repackage:
+    if: github.event_name == 'workflow_dispatch' && inputs.reuse_build_run != ''
+    uses: ./.github/workflows/repackage.yml
+    with:
+      source_run_id: ${{ inputs.reuse_build_run }}
+      package_version: ${{ inputs.package_version }}
+      windows_runner: ${{ inputs.windows_runner }}
     secrets: inherit

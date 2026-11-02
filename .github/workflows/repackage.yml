@@ -1,0 +1,147 @@
+# SPDX-FileCopyrightText: Copyright 2026 Jadyx Project
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Repackage a successful, immutable CI build without configuring or compiling the emulator.
+name: Package existing UWP build
+
+on:
+  workflow_call:
+    inputs:
+      source_run_id:
+        type: string
+        required: true
+      package_version:
+        type: string
+        required: true
+      windows_runner:
+        type: string
+        default: windows-2025
+    secrets:
+      JADYX_PFX_BASE64:
+        required: false
+      JADYX_PFX_PASSWORD:
+        required: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package:
+    name: appx from verified build
+    runs-on: ${{ inputs.windows_runner }}
+    timeout-minutes: 15
+    steps:
+      - name: Require successful source build and its gates
+        id: source
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:SOURCE_RUN_ID -notmatch '^\d+$') { throw 'Expected a numeric CI build run ID' }
+          if ($env:PACKAGE_VERSION -notmatch '^\d+\.\d+\.\d+\.\d+$') { throw 'Expected a four-part package version' }
+          foreach ($part in $env:PACKAGE_VERSION.Split('.')) { $null = [uint16]::Parse($part) }
+          $endpoint = 'repos/${{ github.repository }}/actions/runs/' + $env:SOURCE_RUN_ID
+          $source = gh api $endpoint | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot read source build' }
+          if ($source.status -ne 'completed' -or $source.conclusion -ne 'success' -or
+              $source.path -ne '.github/workflows/ci.yml' -or
+              $source.head_repository.full_name -ne '${{ github.repository }}' -or
+              $source.head_sha -notmatch '^[0-9a-f]{40}$') {
+              throw 'Source must be a successful CI run from this repository'
+          }
+          $jobs = (gh api ($endpoint + '/jobs?per_page=100') | ConvertFrom-Json).jobs
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot read source build gates' }
+          foreach ($required in @('build / jadyx (UWP x64)', 'build / spirv_to_dxil')) {
+              $matched = @($jobs | Where-Object { $_.name -eq $required -and $_.conclusion -eq 'success' })
+              if ($matched.Count -ne 1) { throw ('Missing successful source job: ' + $required) }
+          }
+          "sha=$($source.head_sha)" >> $env:GITHUB_OUTPUT
+          "url=$($source.html_url)" >> $env:GITHUB_OUTPUT
+          "Reusing verified source $($source.head_sha) from $($source.html_url)"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: jadyx-build
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source_run_id }}
+          path: build-uwp/bin
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: spirv-to-dxil
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source_run_id }}
+          path: ${{ runner.temp }}/mesa
+
+      - name: Pack and sign
+        shell: powershell
+        env:
+          JADYX_PFX_BASE64: ${{ secrets.JADYX_PFX_BASE64 }}
+          JADYX_PFX_PASSWORD: ${{ secrets.JADYX_PFX_PASSWORD }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
+          SOURCE_COMMIT: ${{ steps.source.outputs.sha }}
+          SOURCE_BUILD_RUN: ${{ steps.source.outputs.url }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          # Every package carries the project's certificate, so the console updates in place.
+          if (-not $env:JADYX_PFX_BASE64 -or -not $env:JADYX_PFX_PASSWORD) {
+              throw "The JADYX_PFX_BASE64 / JADYX_PFX_PASSWORD secrets are not set"
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP "jadyx.pfx"
+          # A secret piped in from PowerShell can carry a BOM or line breaks; keep only base64.
+          $base64 = $env:JADYX_PFX_BASE64 -replace '[^A-Za-z0-9+/=]', ''
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($base64))
+          $params = @{
+              Release     = $true
+              PfxPath     = $pfx
+              SpirvToDxil = Join-Path $env:RUNNER_TEMP "mesa\spirv_to_dxil.dll"
+          }
+          if ($env:PACKAGE_VERSION) { $params.Version = $env:PACKAGE_VERSION }
+          try { & tools\xbox\package-appx.ps1 @params } finally { Remove-Item $pfx -Force }
+
+          [xml]$mf = Get-Content build-uwp\package\layout\AppxManifest.xml -Raw
+          $version = $mf.Package.Identity.Version
+          $out = New-Item -ItemType Directory -Force out
+          Copy-Item build-uwp\package\jadyx.appx "out\Jadyx_${version}_x64.appx"
+          Copy-Item build-uwp\package\jadyx.cer out\Jadyx.cer
+          Copy-Item build-uwp\package\Microsoft.VCLibs.x64.14.00.appx out\
+          Compress-Archive build-uwp\bin\jadyx.pdb "out\Jadyx_${version}_symbols.zip"
+          [ordered]@{
+              version = $version
+              commit  = $env:SOURCE_COMMIT
+              run     = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+              source_build_run = $env:SOURCE_BUILD_RUN
+          } | ConvertTo-Json | Set-Content -Encoding ascii out\build-info.json
+          Get-ChildItem out -File | Sort-Object Name | ForEach-Object {
+              "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          } | Set-Content -Encoding ascii out\SHA256SUMS.txt
+          Get-ChildItem out | Format-Table Name, Length
+
+      - name: Verify signed package
+        shell: pwsh
+        env:
+          # A personal fork may pin its own certificate. The project's key is
+          # still the default when no explicit public key is configured.
+          JADYX_PACKAGE_PUBLIC_KEY: ${{ vars.JADYX_PACKAGE_PUBLIC_KEY }}
+        run: |
+          $params = @{ Package = "build-uwp/package/jadyx.appx" }
+          if ($env:JADYX_PACKAGE_PUBLIC_KEY) {
+              $key = Join-Path $env:RUNNER_TEMP "expected-package-public-key.pem"
+              Set-Content -LiteralPath $key -Value $env:JADYX_PACKAGE_PUBLIC_KEY -Encoding ascii
+              $params.PublicKeyPath = $key
+          }
+          & tools/xbox/verify-appx.ps1 @params
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: jadyx-package
+          path: out/*
+          if-no-files-found: error
+          retention-days: 14
