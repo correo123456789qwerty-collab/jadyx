@@ -66,7 +66,7 @@ void LogExportTests(Jadyx::NetworkPortal& portal,httplib::Client& client,
     };
     auto state=wait();
     if(state.at("phase")!="ready")std::fprintf(stderr,"logs: %s\n",state.dump().c_str());
-    Check(state.at("phase")=="ready"&&state.at("files")==3,"all log files prepared");
+    Check(state.at("phase")=="ready"&&state.at("files")==4,"all log files prepared including live writer");
     Check(state.at("processed")==state.at("total"),"entire input processed");
     auto grant=client.Post("/api/v1/logs/download",authenticated,"{}","application/json");
     Check(Status(grant)==200,"grant log download");

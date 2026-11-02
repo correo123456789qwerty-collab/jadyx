@@ -177,9 +177,25 @@ jobs:
           -DCMAKE_POLICY_DEFAULT_CMP0141=NEW -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
           -DJADYX_HOST_LTO=${{ inputs.lto && 'ON' || 'OFF' }}
 
+      - name: Check Windows memory and export source before the full build
+        shell: pwsh
+        run: tools/xbox/tests/run-stability-gates.ps1 -SkipPortal
+
       - name: Build
         shell: cmd
         run: tools\xbox\build-env.bat cmake --build --preset uwp-x64 --target jadyx
+
+      # Preserve the expensive linked output even if a later test harness fails. Package still
+      # needs this entire job to succeed; an uploaded executable alone never bypasses the gates.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: jadyx-build
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            build-uwp/bin/jadyx.exe
+            build-uwp/bin/jadyx.pdb
+            build-uwp/bin/*.dll
 
       - name: Test updater policy, HTTP and recovery
         shell: pwsh
@@ -187,7 +203,7 @@ jobs:
 
       - name: Test memory stability and live log export
         shell: pwsh
-        run: tools/xbox/tests/run-stability-gates.ps1
+        run: tools/xbox/tests/run-network-portal.ps1
 
       - name: Compiler cache stats
         if: always()
@@ -223,16 +239,6 @@ jobs:
         with:
           path: .cache/sccache
           key: sccache-uwp-${{ github.run_id }}
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: jadyx-build
-          retention-days: 7
-          if-no-files-found: error
-          path: |
-            build-uwp/bin/jadyx.exe
-            build-uwp/bin/jadyx.pdb
-            build-uwp/bin/*.dll
 
   package:
     name: appx
