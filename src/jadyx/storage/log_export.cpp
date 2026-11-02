@@ -268,7 +268,7 @@ void LogExport::Run(std::stop_token stop) {
             if (entry.directory) continue;
             CheckPath(entry.path);
             Reader reader;
-            reader.Open(entry.path());
+            reader.Open(entry.path);
             std::uint64_t remaining = entry.size;
             while (remaining) {
                 cancelled();

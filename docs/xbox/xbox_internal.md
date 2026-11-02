@@ -4346,3 +4346,8 @@ anticipación. Prueba nativa real integrada en CI. Los errores Read/Write conser
 contadores/muestras pero limitan el log síncrono: 26.630.352 eventos -> 36 líneas
 en el gate, con contabilidad concurrente exacta. No es un arreglo de la causa del
 acceso ni una medida de FPS. Exportador/gates UWP pendientes de ejecución Windows.
+
+Primer CI 0.3.9.2 (41542484724): Linux/Mesa pasan; UWP detecta C2064 en el
+exportador. La enumeración usa directory_entry.path(), pero el snapshot Entry
+tiene un campo path: en la segunda apertura debe ser reader.Open(entry.path).
+Corregido; aprovechar la caché guardada para repetir build y gates Windows.
