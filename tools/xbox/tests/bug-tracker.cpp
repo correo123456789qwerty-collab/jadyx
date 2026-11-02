@@ -20,6 +20,7 @@
 
 #include "common/assert.h"
 #include "common/bug_tracker.h"
+#include "common/guest_diagnostics.h"
 #include "common/logging.h"
 
 // The tracker installs these into the logger and assert code; capture them instead.
@@ -191,6 +192,55 @@ void HitPipelineRejected(int frame) {
     BUG_TRACK(PipelineRejected, "PSO rejected at frame {}", frame);
 }
 
+void TestGuestDiagnostics() {
+    Testing::ResetQueue();
+    Detail::enabled.store(false);
+    Common::GuestDiagnostics::RecordBreakCode(0x1000, 0xdeadbeef);
+    Common::GuestDiagnostics::RecordBacktrace("disabled");
+    assert(DrainAll().empty());
+    Detail::enabled.store(true);
+    Common::GuestDiagnostics::RecordBacktrace({});
+    assert(DrainAll().empty());
+
+    // The panic logger scope mutes the tap; explicit reports must still retain the code.
+    {
+        const TapMute mute;
+        Common::GuestDiagnostics::RecordBreakCode(0x1000, 0xdeadbeef);
+    }
+    auto reports = DrainAll();
+    assert(reports.size() == 1);
+    assert(reports[0].second == "guest break code=0xdeadbeef buffer=0x1000");
+
+    // A normal backtrace exceeds the logger tap's 480-byte message. Exercise all 16 details,
+    // a multi-byte name at the split, a final return-address marker and bounded truncation.
+    const std::string text = std::string(399, 'r') + "\xc3\xa1" +
+                             std::string(5500, 'v') + " final-frame=0x1234 " +
+                             std::string(1000, 't');
+    {
+        const TapMute mute;
+        Common::GuestDiagnostics::RecordBacktrace(text);
+    }
+    reports = DrainAll();
+    assert(reports.size() == Site::DETAIL_SLOTS + 1);
+    std::string recovered;
+    for (std::size_t i = 0; i < Site::DETAIL_SLOTS; ++i) {
+        const auto prefix = "guest backtrace +" + std::to_string(recovered.size()) + ": ";
+        assert(reports[i].second.starts_with(prefix));
+        assert(reports[i].second.size() <= 480);
+        const auto data = reports[i].second.substr(prefix.size());
+        assert(!data.empty() && (static_cast<unsigned char>(data.front()) & 0xc0) != 0x80);
+        recovered += data;
+    }
+    assert(recovered == text.substr(0, recovered.size()));
+    assert(recovered.find("final-frame=0x1234") != std::string::npos);
+    assert(reports.back().second == "guest backtrace truncated: retained " +
+           std::to_string(recovered.size()) + " of " + std::to_string(text.size()) + " bytes");
+    assert(Testing::Dropped() == 0);
+    Common::GuestDiagnostics::RecordBacktrace(text);
+    Common::GuestDiagnostics::RecordBreakCode(0x1000, 0xdeadbeef);
+    assert(DrainAll().empty());
+}
+
 void TestEndToEnd() {
     const auto dir = std::filesystem::temp_directory_path() / "jadyx-bug-tracker-test";
     std::filesystem::remove_all(dir);
@@ -198,6 +248,10 @@ void TestEndToEnd() {
     Install(dir, "test build");
     assert(Enabled() && captured_seen && captured_record && captured_assert);
     SetTitle(0x01000000000BB000ULL, "Game B");
+    {
+        const TapMute mute;
+        Common::GuestDiagnostics::RecordBreakCode(0x2000, 0xcafe1234);
+    }
 
     for (int frame = 0; frame < 5; ++frame) {
         TickFrame();
@@ -237,6 +291,8 @@ void TestEndToEnd() {
     assert(log.find("[Unimplemented] video_core/engines/maxwell_dma.cpp:117") != std::string::npos);
     assert(log.find("=== Summary") != std::string::npos);
     assert(json.find("\"title_id\": \"01000000000BB000\"") != std::string::npos);
+    assert(log.find("guest break code=0xcafe1234 buffer=0x2000") != std::string::npos);
+    assert(json.find("guest break code=0xcafe1234 buffer=0x2000") != std::string::npos);
     assert(json.find("\"file\": \"video_core/engines/puller.cpp\", \"line\": 114, \"hits\": 100") !=
            std::string::npos);
     assert(json.find("\"file\": \"video_core/engines/maxwell_dma.cpp\", \"line\": 117, \"hits\": 3") !=
@@ -292,14 +348,22 @@ void Benchmark() {
 }
 } // Anonymous namespace
 
-int main() {
+int main(int argc, char** argv) {
+    const bool benchmark = argc == 1;
+    if (!benchmark && (argc != 2 || std::string_view{argv[1]} != "--no-benchmark")) {
+        std::cerr << "usage: bug-tracker [--no-benchmark]\n";
+        return 2;
+    }
     TestSites();
     TestConcurrentKeys();
     TestQueue();
     TestHelpers();
+    TestGuestDiagnostics();
     TestEndToEnd();
-    Benchmark();
+    // Instrumentation changes instruction cost: sanitizer runs check correctness separately
+    // from the optimized build's five-nanosecond regression threshold.
+    if (benchmark) Benchmark();
     std::cout << "PASS: sites, lazy arguments, detail keys and overflow, concurrent reports, "
                  "lock-free queue, classification, location parsing, JSON escaping, end-to-end "
-                 "files and benchmark\n";
+                 "files and bounded guest diagnostics\n";
 }

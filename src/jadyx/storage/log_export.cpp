@@ -58,6 +58,23 @@ std::string Pax(std::string_view key, std::string_view value) {
 struct Reader {
     HANDLE handle{INVALID_HANDLE_VALUE};
     ~Reader() { if (handle != INVALID_HANDLE_VALUE) CloseHandle(handle); }
+    void Open(const std::filesystem::path& path) {
+        CREATEFILE2_EXTENDED_PARAMETERS options{sizeof(options)};
+        options.dwFileFlags = FILE_FLAG_SEQUENTIAL_SCAN | FILE_FLAG_OPEN_REPARSE_POINT;
+        handle = CreateFile2FromAppW(path.c_str(), GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, OPEN_EXISTING, &options);
+        if (handle == INVALID_HANDLE_VALUE) throw Failure{"read"};
+        FILE_ATTRIBUTE_TAG_INFO tag{};
+        if (!GetFileInformationByHandleEx(handle, FileAttributeTagInfo, &tag, sizeof(tag)) ||
+            (tag.FileAttributes & (FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY)))
+            throw Failure{"unsafe"};
+    }
+    std::uint64_t Size() const {
+        FILE_STANDARD_INFO info{};
+        if (!GetFileInformationByHandleEx(handle, FileStandardInfo, &info, sizeof(info)) ||
+            info.EndOfFile.QuadPart < 0) throw Failure{"read"};
+        return static_cast<std::uint64_t>(info.EndOfFile.QuadPart);
+    }
 };
 } // namespace
 
@@ -150,7 +167,14 @@ void LogExport::Run(std::stop_token stop) {
             CheckPath(entry.path());
             const bool folder = entry.is_directory();
             if (!folder && !entry.is_regular_file()) throw Failure{"unsafe"};
-            const auto size = folder ? 0 : entry.file_size();
+            // Directory enumeration can retain a live log's old size (including zero) while
+            // its writer stays open on Windows. Query the opened file, using the UWP API.
+            std::uint64_t size{};
+            if (!folder) {
+                Reader reader;
+                reader.Open(entry.path());
+                size = reader.Size();
+            }
             if (entries.size() >= 100000 || size > (1ULL << 40) - total) throw Failure{"limit"};
             auto name = "log/" + Utf8(entry.path().lexically_relative(root)) + (folder ? "/" : "");
             entries.push_back({entry.path(), std::move(name), size, folder});
@@ -243,16 +267,8 @@ void LogExport::Run(std::stop_token stop) {
             emit(header.data(), header.size());
             if (entry.directory) continue;
             CheckPath(entry.path);
-            CREATEFILE2_EXTENDED_PARAMETERS options{sizeof(options)};
-            options.dwFileFlags = FILE_FLAG_SEQUENTIAL_SCAN | FILE_FLAG_OPEN_REPARSE_POINT;
             Reader reader;
-            reader.handle = CreateFile2FromAppW(entry.path.c_str(), GENERIC_READ,
-                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, OPEN_EXISTING, &options);
-            if (reader.handle == INVALID_HANDLE_VALUE) throw Failure{"read"};
-            FILE_ATTRIBUTE_TAG_INFO tag{};
-            if (!GetFileInformationByHandleEx(reader.handle, FileAttributeTagInfo, &tag, sizeof(tag)) ||
-                (tag.FileAttributes & (FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY)))
-                throw Failure{"unsafe"};
+            reader.Open(entry.path());
             std::uint64_t remaining = entry.size;
             while (remaining) {
                 cancelled();

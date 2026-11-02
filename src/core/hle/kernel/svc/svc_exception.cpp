@@ -6,6 +6,7 @@
 
 #include <cctype>
 #include "common/bug_tracker.h"
+#include "common/guest_diagnostics.h"
 #include "core/core.h"
 #include "core/debugger/debugger.h"
 #include "core/hle/kernel/k_process.h"
@@ -35,7 +36,9 @@ void Break(Core::System& system, BreakReason reason, u64 info1, u64 info2) {
 
         // This typically is an error code so we're going to assume this is the case
         if (sz == sizeof(u32)) {
-            LOG_CRITICAL(Debug_Emulated, "debug_buffer_err_code={:X}", memory.Read32(addr));
+            const u32 code = memory.Read32(addr);
+            Common::GuestDiagnostics::RecordBreakCode(addr, code);
+            LOG_CRITICAL(Debug_Emulated, "debug_buffer_err_code={:X}", code);
         } else {
             // We don't know what's in here so we'll hexdump it
             debug_buffer.resize(sz);

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright 2026 Jadyx Project
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-name: Video decoder gates
+name: Video and guest regression gates
 
 on:
   workflow_call:
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   video:
-    name: video decoder regressions
+    name: video and guest regressions
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -46,9 +46,28 @@ jobs:
           echo "PKG_CONFIG_PATH=$RUNNER_TEMP/video-fmt-prefix/lib/pkgconfig" >> "$GITHUB_ENV"
       - name: Decode synthetic H.264, VP8 and VP9 with sanitizers
         run: python3 tools/xbox/tests/run-video-gates.py --sanitize --output test-results/series-s-video/sanitized.json
+      - name: Reset guest page tables and preserve fatal diagnostics with sanitizers
+        run: |
+          guest_flags=(-std=c++20 -O1 -g -pthread -fno-omit-frame-pointer
+            -fsanitize=address,undefined -DFMT_HEADER_ONLY -Isrc
+            -I"$RUNNER_TEMP/video-fmt-prefix/include")
+          g++ "${guest_flags[@]}" tools/xbox/tests/page-table-reset.cpp \
+            src/common/page_table.cpp src/common/sparse_large_vector.cpp \
+            -o "$RUNNER_TEMP/guest-page-table-reset"
+          "$RUNNER_TEMP/guest-page-table-reset" | tee test-results/series-s-video/guest-page-table-reset.txt
+          g++ "${guest_flags[@]}" tools/xbox/tests/bug-tracker.cpp src/common/bug_tracker.cpp \
+            -o "$RUNNER_TEMP/guest-diagnostics"
+          "$RUNNER_TEMP/guest-diagnostics" --no-benchmark | tee test-results/series-s-video/guest-diagnostics.txt
+          g++ "${guest_flags[@]}" tools/xbox/tests/fault-log-limiter.cpp \
+            -o "$RUNNER_TEMP/fault-log-limiter"
+          "$RUNNER_TEMP/fault-log-limiter" | tee test-results/series-s-video/fault-log-limiter.txt
       - uses: actions/upload-artifact@v7
         with:
           name: video-decoder-gates
-          path: test-results/series-s-video/sanitized.json
+          path: |
+            test-results/series-s-video/sanitized.json
+            test-results/series-s-video/guest-page-table-reset.txt
+            test-results/series-s-video/guest-diagnostics.txt
+            test-results/series-s-video/fault-log-limiter.txt
           if-no-files-found: error
           retention-days: 14

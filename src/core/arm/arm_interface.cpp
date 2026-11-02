@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright 2018 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include "common/guest_diagnostics.h"
 #include "common/logging.h"
 #include "core/arm/arm_interface.h"
 #include "core/arm/debug.h"
@@ -40,6 +41,8 @@ void ArmInterface::LogBacktrace(Kernel::KProcess* process) const {
     auto const backtrace = GetBacktraceFromContext(process, ctx);
     for (auto const& entry : backtrace)
         msg += fmt::format("{:20}{:016X}    {:016X}    {:016X}    {}\n", entry.module, entry.address, entry.original_address, entry.offset, entry.name);
+    Common::GuestDiagnostics::RecordBacktrace(msg);
+    const Common::BugTracker::TapMute bug_tracker_mute;
     LOG_ERROR(Core_ARM, "{}", msg);
 }
 

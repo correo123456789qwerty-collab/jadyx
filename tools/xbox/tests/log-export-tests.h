@@ -33,6 +33,12 @@ void DecodeLogArchive(std::string_view bytes,const std::filesystem::path& path) 
 void LogExportTests(Jadyx::NetworkPortal& portal,httplib::Client& client,
                     const httplib::Headers& authenticated,const std::filesystem::path& root) {
     using namespace std::chrono_literals;
+    // Match the console: the logger flushes but keeps its writer open throughout export.
+    // Windows directory enumeration may still advertise its creation-time size (zero).
+    std::ofstream live{root/"log"/"live.log",std::ios::binary};
+    for(unsigned i=0;i<10000;++i)live<<"live diagnostic before export "<<i<<'\n';
+    live.flush();
+    Check(live.good(),"live log flushed with writer still open");
     client.set_read_timeout(15);
     Check(Status(client.Post("/api/v1/logs/export","{}","application/json"))==401,"logs require pairing");
     Check(Status(client.Get("/api/v1/logs/archive"))==401,"anonymous logs rejected");

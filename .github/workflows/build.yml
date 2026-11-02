@@ -185,6 +185,10 @@ jobs:
         shell: pwsh
         run: tools/xbox/tests/run-updater-gates.ps1
 
+      - name: Test memory stability and live log export
+        shell: pwsh
+        run: tools/xbox/tests/run-stability-gates.ps1
+
       - name: Compiler cache stats
         if: always()
         continue-on-error: true
