@@ -4321,3 +4321,28 @@ en gameplay en 0.3.8.0. Cuphead DLC tiene reporte de finalización, no certifica
 general de ausencia de fallos. Odyssey conserva clasificación y resultado previo;
 el informe separado del crash se enlaza como limitación. No se cambian etiquetas
 de Discord, código ni paquetes. Validación documental: enlaces locales y diff.
+
+## Final Fantasy Resonance — revisión 0.3.9.1, 2 nov 2026
+
+El usuario prioriza Final Fantasy. El resumen recibido confirma 210.574 lecturas
+y 26.630.352 escrituras no mapeadas, después PANIC/svcBreak en el frame 14.129.
+No atribuir la pantalla negra solo a shaders. TXT vacíos en el tar y traza
+truncada impiden conocer todavía el código del aborto y su origen.
+
+Se corrige `ResizeAndClear` sin limpieza al conservar tamaño: el gate con las
+tablas metadata/JIT de producción falla antes y pasa después. No está demostrado
+que ese defecto cause este caso. Exportador usa tamaño por handle, porque Windows
+puede devolver tamaños de directorio antiguos para escritores abiertos; gate
+Windows/Series pendiente. Código de aborto y traza ARM acotada se conservan
+explícitamente en el tracker, incluso con su tap silenciado. Los gates locales
+optimizados y ASan/UBSan pasan; CI preparado, sin ejecutar remoto. No hay APPX
+nuevo, commit, push ni mejora FPS certificada. Datos, comandos y siguientes
+pruebas en [xbox_final_fantasy.md](xbox_final_fantasy.md).
+
+Ampliación autorizada antes de 0.3.9.2: se corrige el registro Windows de reservas
+(comparaba páginas con bytes al liberar), extremo final exclusivo y clasificación
+del VEH; nunca rebajar RW por una lectura ni comprometer la página vecina por
+anticipación. Prueba nativa real integrada en CI. Los errores Read/Write conservan
+contadores/muestras pero limitan el log síncrono: 26.630.352 eventos -> 36 líneas
+en el gate, con contabilidad concurrente exacta. No es un arreglo de la causa del
+acceso ni una medida de FPS. Exportador/gates UWP pendientes de ejecución Windows.

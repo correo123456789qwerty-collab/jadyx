@@ -30,6 +30,10 @@ en documentación histórica ya no son carpetas de entrega vigentes.
 
 ## Rendimiento y evidencia
 
+- [Final Fantasy Resonance en 0.3.9.1](xbox_final_fantasy.md): PANIC y accesos no
+  mapeados confirmados; corrección reproducida de reinicialización de tablas y
+  candidato para preservar logs/código de aborto. Causalidad y Series pendientes.
+
 - [Vídeo y prioridades Series S](xbox_series_s_video.md): candidato de propiedad/padding,
   backpressure y fallback FFmpeg; pruebas CPU reproducibles, UWP y juegos pendientes.
 

@@ -1,5 +1,20 @@
 # AGENTS.md: guía para agentes de IA en Jadyx (fork de JulianDr14)
 
+Usuarioautoriza desarrolloautónomo/estabilidadgeneral yposteriorinstalador0.3.9.2.
+Se añaden fixesWindowsSparse: desregistro páginas/bytes, intervalossemiabiertos,
+VEHsololecturas/reservasvivas/sinrebajarRW; límite logsRead/Write no mapeados
+contrackeríntegro (26630352eventos->36líneas). GatesLinuxopt/ASan/UBSan pasan;
+gatesWindowsreales yexportadorTCP añadidosaCI. Prepararentregaenforkpersonal,
+sinreleasepública; pruebaSeries/FPS/causaFF siguenpendientes. Detalle FFdoc.
+
+2nov2026, reporteSeries0.3.9.1: prioridad exclusiva FinalFantasy. JSON confirma
+210574lecturas/26630352escrituras no mapeadas yPANICsvcBreak enframe14129;
+pantallanegra no essolo shaders. LogsTXTexportados vacíos. Candidato local:
+resetSparseLargeVector limpiaigualtamaño (gatePageTable fallaantes/pasadespués),
+exportador consulta tamaño porhandle ytracker conserva códigoPANIC/trazaacotada.
+Sin causalidadFFdemostrada niFPScertificados; build/gateportalWindows ySeries
+pendientes, sinAPPXnuevo/commit/push. Detalle docs/xbox/xbox_final_fantasy.md.
+
 Entrega personal0.3.9.1 completada2nov2026: run41523693476 todoPASS, fuentea915a1e,
 WindowsUWPx64Release/LTO, Mesa ytestsactualizador/vídeo correctos. APPXfirmado
 en build-uwp/package/jadyx.appx, dependenciaVCLibs/certpúblico al lado; símbolos

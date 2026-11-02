@@ -2,8 +2,9 @@
 
 2 de noviembre de 2026. Rama `feature/series-s-video-stability`, basada en
 `52c95fae381fbc30a0aac3d13dba0850fa774b84` (main remoto comprobado al iniciar).
-Estado: instalador personal 0.3.9.1 generado y verificado; instalación y gameplay
-en Xbox todavía pendientes.
+Estado: instalador personal 0.3.9.1 generado y verificado; el usuario ya lo probó
+en Series S. Final Fantasy sigue con fallos gráficos y termina en un PANIC del
+guest. [Revisión de logs y candidato local posterior](xbox_final_fantasy.md).
 
 ## Entrega completada
 
@@ -24,8 +25,9 @@ SHA256 coincidentes con el código de vídeo del instalador.
 
 Evidencia local: `test-results/series-s-video/installer-verification.json`,
 `installer-run.json`, `video-ci-final/sanitized.json` y `installer-artifact/`.
-No se ha instalado en Xbox ni probado juegos; compilar y firmar no certifica
-resolver los reportes ni mejorar FPS. No se publicó una release.
+La entrega inicial no incluyó pruebas de juegos. El reporte posterior del usuario
+está en la revisión enlazada arriba; los síntomas siguen sin resolución certificada.
+No se publicó una release.
 
 ## Objetivo y alcance
 
