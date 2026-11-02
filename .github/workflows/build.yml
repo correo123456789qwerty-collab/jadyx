@@ -21,6 +21,10 @@ on:
         description: Link-time optimize the emulator's libraries (JADYX_HOST_LTO), as releases ship
         type: boolean
         default: false
+      windows_runner:
+        description: Windows compiler image for the build and package jobs
+        type: string
+        default: windows-2025
     secrets:
       JADYX_PFX_BASE64:
         required: false
@@ -39,7 +43,7 @@ permissions:
 jobs:
   mesa:
     name: spirv_to_dxil
-    runs-on: windows-2025
+    runs-on: ${{ inputs.windows_runner }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
@@ -50,7 +54,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: mesa-out
-          key: spirv-to-dxil-${{ hashFiles('tools/xbox/build-spirv-to-dxil.ps1', 'tools/xbox/mesa/**', 'externals/spirv-to-dxil/include/**') }}
+          key: spirv-to-dxil-${{ inputs.windows_runner }}-${{ hashFiles('tools/xbox/build-spirv-to-dxil.ps1', 'tools/xbox/mesa/**', 'externals/spirv-to-dxil/include/**') }}
 
       - name: Build spirv_to_dxil.dll
         if: steps.cache.outputs.cache-hit != 'true'
@@ -70,7 +74,7 @@ jobs:
 
   emulator:
     name: jadyx (UWP x64)
-    runs-on: windows-2025
+    runs-on: ${{ inputs.windows_runner }}
     timeout-minutes: 240
     env:
       # Without the R2 bucket, sccache keeps its objects in one directory, saved as a single cache
@@ -230,7 +234,7 @@ jobs:
     name: appx
     if: inputs.package
     needs: [mesa, emulator]
-    runs-on: windows-2025
+    runs-on: ${{ inputs.windows_runner }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7

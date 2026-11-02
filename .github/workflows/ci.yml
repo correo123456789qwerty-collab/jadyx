@@ -25,6 +25,13 @@ on:
         description: Enable the host link-time optimization used by releases
         type: boolean
         default: true
+      windows_runner:
+        description: Windows compiler image (2022 provides the VS 2022 fallback)
+        type: choice
+        options:
+          - windows-2025
+          - windows-2022
+        default: windows-2025
 
 permissions:
   contents: read
@@ -50,4 +57,5 @@ jobs:
       package: ${{ github.event_name == 'workflow_dispatch' && inputs.package }}
       package_version: ${{ github.event_name == 'workflow_dispatch' && inputs.package_version || '' }}
       lto: ${{ github.event_name == 'workflow_dispatch' && inputs.lto }}
+      windows_runner: ${{ github.event_name == 'workflow_dispatch' && inputs.windows_runner || 'windows-2025' }}
     secrets: inherit

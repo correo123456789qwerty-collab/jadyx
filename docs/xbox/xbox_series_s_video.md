@@ -125,6 +125,22 @@ identidad del paquete y se entrega el certificado público junto al APPX; la
 instalación/actualización y conservación de datos deben validarse en consola.
 Todavía no se ha producido un APPX ni publicado una release.
 
+### Alternativa de compilación
+
+El usuario solicita cambiar de método si continúan los fallos. Se prepara
+`windows_runner=windows-2022` con `lto=false`: mantiene la compilación UWP Release
+con `/O2` y utiliza Visual Studio 2022. La [imagen oficial Windows 2022](https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md)
+incluye ese compilador y las herramientas UWP. GitHub migró `windows-2025` a
+[Visual Studio 2026](https://github.blog/changelog/2026-05-14-github-actions-upcoming-image-migrations/).
+La caché Mesa se separa por imagen para conservar la coherencia del toolchain.
+
+```bash
+gh workflow run ci.yml --repo correo123456789qwerty-collab/jadyx --ref feature/series-s-video-stability -f package=true -f package_version=0.3.9.1 -f windows_runner=windows-2022 -f lto=false
+```
+
+El intento optimizado continúa activo al preparar esta opción. No se ha
+diagnosticado un fallo de LTO ni medido el rendimiento de la alternativa.
+
 Para continuar, recoger primero el log 0.3.9.0 de Final Fantasy y Qliphah mediante
 «Comprimir y descargar logs» en el portal. Anotar actualización del juego, escena
 y punto exacto del fallo. Con el candidato compilado, repetir manualmente esas
