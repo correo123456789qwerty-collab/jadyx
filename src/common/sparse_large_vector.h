@@ -72,6 +72,10 @@ public:
 
             auto denom = HostPageSize * 64;
             committed_pages = std::vector<std::atomic<u64>>((alloc_size + denom - 1) / denom);
+        } else if (count != 0) {
+            // Reinitializing a process at the same address-space width must also discard
+            // its old metadata and the absolute host pointers consumed by Dynarmic.
+            ZeroRegion(0, count);
         }
     }
 

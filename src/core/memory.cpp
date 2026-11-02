@@ -15,7 +15,9 @@
 
 #include "common/assert.h"
 #include "common/atomic_ops.h"
+#include "common/bug_tracker.h"
 #include "common/common_types.h"
+#include "common/fault_log_limiter.h"
 #include "common/heap_tracker.h"
 #include "common/logging.h"
 #include "common/page_table.h"
@@ -47,6 +49,9 @@ static inline bool AddressSpaceContains(const Common::PageTable& table, const Co
 // subsystem without needing to rebuild all files that make use of the memory interface.
 struct Memory::Impl {
     explicit Impl(Core::System& system_) : system{system_} {}
+
+    Common::FaultLogLimiter unmapped_read_logs;
+    Common::FaultLogLimiter unmapped_write_logs;
 
     void SetCurrentPageTable(Kernel::KProcess& process) {
         current_page_table = &process.GetPageTable().GetImpl();
@@ -642,8 +647,15 @@ struct Memory::Impl {
     template <typename T>
     inline T Read(Common::ProcessAddress vaddr) noexcept requires(std::is_trivially_copyable_v<T>) {
         const u64 addr = GetInteger(vaddr);
-        if (auto const ptr = GetPointerImpl(addr, [addr]() {
-            LOG_ERROR(HW_Memory, "Unmapped Read{} @ {:#016x}", sizeof(T) * 8, addr);
+        if (auto const ptr = GetPointerImpl(addr, [this, addr]() {
+            BUG_TRACK_KEY(Other, addr, "Unmapped Read{} @ {:#016x}", sizeof(T) * 8, addr);
+            const auto occurrence = unmapped_read_logs.Next();
+            if (Common::FaultLogLimiter::ShouldLog(occurrence) ||
+                Settings::values.extended_logging.GetValue()) {
+                const Common::BugTracker::TapMute mute;
+                LOG_ERROR(HW_Memory, "Unmapped Read{} @ {:#016x} (occurrence {})",
+                          sizeof(T) * 8, addr, occurrence);
+            }
         }, [&](u8* host_ptr) {
             HandleRasterizerDownload(addr, sizeof(T), host_ptr);
         }); ptr) [[likely]] {
@@ -663,8 +675,16 @@ struct Memory::Impl {
     template <typename T>
     inline void Write(Common::ProcessAddress vaddr, const T data) noexcept requires(std::is_trivially_copyable_v<T>) {
         const u64 addr = GetInteger(vaddr);
-        if (auto const ptr = GetPointerImpl(addr, [addr, data]() {
-            LOG_ERROR(HW_Memory, "Unmapped Write{} @ {:#016x} = {:#016x}", sizeof(T) * 8, addr, u64(data));
+        if (auto const ptr = GetPointerImpl(addr, [this, addr, data]() {
+            BUG_TRACK_KEY(Other, addr, "Unmapped Write{} @ {:#016x} = {:#016x}",
+                          sizeof(T) * 8, addr, u64(data));
+            const auto occurrence = unmapped_write_logs.Next();
+            if (Common::FaultLogLimiter::ShouldLog(occurrence) ||
+                Settings::values.extended_logging.GetValue()) {
+                const Common::BugTracker::TapMute mute;
+                LOG_ERROR(HW_Memory, "Unmapped Write{} @ {:#016x} = {:#016x} (occurrence {})",
+                          sizeof(T) * 8, addr, u64(data), occurrence);
+            }
         }, [&](u8* host_ptr) { HandleRasterizerWrite(addr, sizeof(T), host_ptr); }); ptr) [[likely]]
             std::memcpy(ptr, &data, sizeof(T));
     }

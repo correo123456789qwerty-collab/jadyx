@@ -59,58 +59,42 @@ PVOID AddExceptionHandler(ULONG first, PVECTORED_EXCEPTION_HANDLER handler) {
 static std::vector<std::pair<u64, u64>> vector_regions {};
 static std::mutex vector_regions_mutex {};
 
-// Workaround for handling non-commited memory accessed by Dynarmic; usually result of an error
+// Dynarmic reads the raw sparse JIT table, including reserved pages whose entries are all zero.
 static LONG WINAPI FakePageFaultHandler(PEXCEPTION_POINTERS info) {
-    DWORD code = info->ExceptionRecord->ExceptionCode;
-    u64 exception_addr = static_cast<u64>(info->ExceptionRecord->ExceptionInformation[1]);
-
-    if (code != EXCEPTION_ACCESS_VIOLATION || info->ExceptionRecord->ExceptionInformation[0] == 1) {
-        // Not our problem
+    const auto& record = *info->ExceptionRecord;
+    if (record.ExceptionCode != EXCEPTION_ACCESS_VIOLATION || record.NumberParameters < 2 ||
+        (record.ExceptionFlags & EXCEPTION_NONCONTINUABLE) || record.ExceptionInformation[0] != 0) {
         return EXCEPTION_CONTINUE_SEARCH;
     }
-
-    u64 addr = 0, addr2 = 0;
-
-    {
-        std::lock_guard lock(vector_regions_mutex);
-        for (auto region: vector_regions) {
-            auto addr_shifted = exception_addr >> HostPageBits;
-            if (region.first <= addr_shifted && addr_shifted <= region.second) {
-                addr = addr_shifted;
-            }
-
-            // Page-boundary accesses
-            if (auto addr_ = (exception_addr + 0x40) >> HostPageBits; addr_ != addr_shifted && region.first <= addr_ && addr_ <= region.second) {
-                addr2 = addr_;
-            }
-
-            if (addr != 0 || addr2 != 0) {
-                break;
-            }
-        }
-    }
-
-    if (addr == 0 && addr2 == 0) {
-        // Not our problem
+    const u64 exception_addr = record.ExceptionInformation[1];
+    const u64 page = exception_addr >> HostPageBits;
+    // FreeMemoryPages takes this lock too: keep ownership stable until the page is committed.
+    std::lock_guard lock(vector_regions_mutex);
+    const bool owned = std::ranges::any_of(vector_regions, [page](const auto& region) {
+        return region.first <= page && page < region.second;
+    });
+    if (!owned) {
         return EXCEPTION_CONTINUE_SEARCH;
     }
-
-    LOG_ERROR(HW_Memory, "Accessing an unallocated region of a SparseLargeVector at {:#x}; this shouldn't happen and is likely a Dynarmic error!", exception_addr);
-
-    // Commit this region
-    if (addr != 0) {
-        if (!CommitVectorPage(addr << HostPageBits, false)) {
-            return EXCEPTION_CONTINUE_SEARCH;
-        }
+    // A protection fault on a committed page is not a sparse-table first read. In particular,
+    // do not change permissions of live writable metadata or unrelated reused memory.
+    MEMORY_BASIC_INFORMATION state{};
+    if (!VirtualQuery(reinterpret_cast<void*>(exception_addr), &state, sizeof(state))) {
+        return EXCEPTION_CONTINUE_SEARCH;
     }
-    // Commit next region if needed
-    if (addr2 != 0) {
-        if (!CommitVectorPage(addr2 << HostPageBits, false)) {
-            return EXCEPTION_CONTINUE_SEARCH;
-        }
+    if (state.State == MEM_COMMIT) {
+        // Another reader/writer may have committed the page while this fault was pending.
+        // Retry readable pages without downgrading a concurrent writer's permissions.
+        constexpr DWORD readable = PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY |
+                                   PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
+        return (state.Protect & readable) && !(state.Protect & PAGE_GUARD)
+                   ? EXCEPTION_CONTINUE_EXECUTION : EXCEPTION_CONTINUE_SEARCH;
     }
-
-    return EXCEPTION_CONTINUE_EXECUTION;
+    if (state.State != MEM_RESERVE) return EXCEPTION_CONTINUE_SEARCH;
+    // Commit only the reported fault page. A crossing access can fault on its next page;
+    // guessing a page at fault+64 could commit outside the vector.
+    return CommitVectorPage(page << HostPageBits, false) ? EXCEPTION_CONTINUE_EXECUTION
+                                                       : EXCEPTION_CONTINUE_SEARCH;
 }
 
 bool CommitVectorPage(uintptr_t addr, bool write) noexcept {
@@ -119,6 +103,12 @@ bool CommitVectorPage(uintptr_t addr, bool write) noexcept {
     if (res == 0) {
         LOG_CRITICAL(HW_Memory, "Failed to query large buffer region at {:#x} with error {}, will try committing anyway", addr, GetLastError());
     } else if (info.State == MEM_COMMIT) {
+        if (!write) {
+            // Preserve permissions if a concurrent mapping committed this page first.
+            constexpr DWORD readable = PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY |
+                                       PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
+            return (info.Protect & readable) && !(info.Protect & PAGE_GUARD);
+        }
         ULONG old_protect {};
         auto perm = write ? PAGE_READWRITE : PAGE_READONLY;
         if (!LARGE_VECTOR_VIRTUAL_PROTECT(reinterpret_cast<void*>(addr), HostPageSize, perm, &old_protect)) {
@@ -200,7 +190,8 @@ void FreeMemoryPages(void* base, [[maybe_unused]] std::size_t size) noexcept {
         return;
 #ifdef _WIN32
     std::lock_guard lock(vector_regions_mutex);
-    std::erase_if(vector_regions, [base](const auto& r) {return r.first == reinterpret_cast<u64>(base); });
+    const u64 first_page = reinterpret_cast<u64>(base) >> HostPageBits;
+    std::erase_if(vector_regions, [first_page](const auto& r) { return r.first == first_page; });
     ASSERT(VirtualFree(base, 0, MEM_RELEASE));
 #else
     ASSERT(munmap(base, size) == 0);
