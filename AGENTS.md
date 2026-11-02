@@ -1,5 +1,30 @@
 # AGENTS.md: guía para agentes de IA en Jadyx (fork de JulianDr14)
 
+Entrega personal solicitada por el usuario: el repositorio de esta compilación
+es `correo123456789qwerty-collab/jadyx`, fork público creado para poder ejecutar
+Actions sin permisos de escritura en JulianDr14/jadyx. En este checkout,
+`origin` conserva el original como referencia de lectura y `personal` es el
+destino de la rama de entrega. Las restricciones históricas de destino de abajo
+se mantienen para el proyecto original; esta entrega solo escribe en el fork
+personal. Firma propia configurada en secretos cifrados, pin público explícito;
+material privado fuera del repo. No publicar releases ni escribir issues/PRs
+en los proyectos originales. La identidad de los commits es la cuenta del usuario.
+
+2nov2026: feature/series-s-video-stability, prioridad Final Fantasy Resonance,
+cierre Qliphah y finalmente FPS Mario Kart8Deluxe enSeriesS/0.3.9.0. Packet
+pendiente conservado/completado: ownedpadding, EAGAIN drain/retry, aceptación
+antesoffsets, formatos por dispositivo/oferta, frames CPU sintransferGPU yguardas
+asignación/API. GateCPU396framesH264/VP8/VP9 normales/fallback+128rawvideo y
+ASan/UBSan(sinvptr) pasan; HEADfalla VP9backpressure. CI preparado, sinrunremoto.
+Linux sinUWP/consola/logs específicos: sinAPPX ni juegos/FPS certificados.
+Sincommit/push; detalle docs/xbox/xbox_series_s_video.md.
+
+Instalador solicitado: CI manual acepta versión0.3.9.1 yLTO; jobpackage verifica
+CMS/keypin/digests/bloques antesdeartefacto. YAML/releasechecks pasan. GHautenticado
+sinpush aloriginal; forkpersonal creado con secretosfirma ypinpúblico propios.
+Se prepara rama de entrega paraActions; buildremoto/APPX pendientes. Manifiesto
+fuente0.3.9.0; el empaquetado solicita0.3.9.1 explícitamente.
+
 Pulse20oct: rama feature/pulse-resume-audit desde main. Auditoría logsSeries.25:
 HID acepta/guarda revisionu32 pero restore limitaba0..3; codec conserva valor
 exacto y añade lognumérico, Pulse1.1.1 compatible1.1.0. Ocho revisiones/byteslegacy/

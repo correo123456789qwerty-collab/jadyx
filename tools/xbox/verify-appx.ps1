@@ -3,7 +3,12 @@
 # Bounded-memory verification of payload blocks and their signed metadata chain.
 # Windows still performs its own package policy/deployment checks at installation.
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$Package)
+param(
+    [Parameter(Mandatory)][string]$Package,
+    # Personal forks can explicitly pin their own distribution certificate.
+    # Omitting this parameter keeps the upstream project's pinned key.
+    [string]$PublicKeyPath = "$PSScriptRoot/../../src/jadyx/updates/release_public_key.pem"
+)
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 Add-Type -AssemblyName System.Security.Cryptography.Pkcs
@@ -25,7 +30,7 @@ try {
     if($cms.SignerInfos.Count -ne 1 -or $cms.ContentInfo.ContentType.Value -ne '1.3.6.1.4.1.311.2.1.4'){throw 'Unexpected APPX signature content'}
     $public=[Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPublicKey($cms.SignerInfos[0].Certificate)
     try{$pem=$public.ExportSubjectPublicKeyInfoPem() -replace '\s',''}finally{$public.Dispose()}
-    $pin=(Get-Content -LiteralPath "$PSScriptRoot/../../src/jadyx/updates/release_public_key.pem" -Raw) -replace '\s',''
+    $pin=(Get-Content -LiteralPath $PublicKeyPath -Raw) -replace '\s',''
     if($pem -cne $pin){throw 'Unexpected APPX signer'}
     # SpcIndirectDataContent -> DigestInfo -> APPX digest table (Microsoft MSIX SDK).
     $asn=[System.Formats.Asn1.AsnReader]::new([ReadOnlyMemory[byte]]::new($cms.ContentInfo.Content),[System.Formats.Asn1.AsnEncodingRules]::DER)

@@ -286,6 +286,21 @@ jobs:
           } | Set-Content -Encoding ascii out\SHA256SUMS.txt
           Get-ChildItem out | Format-Table Name, Length
 
+      - name: Verify signed package
+        shell: pwsh
+        env:
+          # A personal fork may pin its own certificate. The project's key is
+          # still the default when no explicit public key is configured.
+          JADYX_PACKAGE_PUBLIC_KEY: ${{ vars.JADYX_PACKAGE_PUBLIC_KEY }}
+        run: |
+          $params = @{ Package = "build-uwp/package/jadyx.appx" }
+          if ($env:JADYX_PACKAGE_PUBLIC_KEY) {
+              $key = Join-Path $env:RUNNER_TEMP "expected-package-public-key.pem"
+              Set-Content -LiteralPath $key -Value $env:JADYX_PACKAGE_PUBLIC_KEY -Encoding ascii
+              $params.PublicKeyPath = $key
+          }
+          & tools/xbox/verify-appx.ps1 @params
+
       - uses: actions/upload-artifact@v7
         with:
           name: jadyx-package

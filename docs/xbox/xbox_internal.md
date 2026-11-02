@@ -4,6 +4,26 @@ Cuaderno de trabajo del port: cómo compilar, en qué fase vamos y lo que hemos 
 Los docs "de verdad" son [`uwp_build.md`](uwp_build.md) (toolchain) y [`xbox_deploy.md`](xbox_deploy.md)
 (empaquetar y desplegar). Aquí va el resumen rápido y todo lo que no cabe en ellos.
 
+2nov2026, `feature/series-s-video-stability`: prioridad usuario Final Fantasy
+Resonance, cierre tras cinemática Qliphah y finalmente FPS Mario Kart 8 Deluxe,
+todos reportados en Series S/0.3.9.0. Se conserva y completa Packet pendiente:
+propiedad/padding, EAGAIN con drenaje/reintento, offsets solo tras aceptación,
+negociación según dispositivo/oferta y distinción frame hardware/software.
+Guardas de asignación/API y entrega de salida previa tras rechazo. Gate CPU
+H264/VP8/VP9 normal/fallback, 396 frames exactos, más128 rawvideo; ASan/UBSan
+sin vptr pasan. Control HEAD falla VP9 bajo backpressure. CI preparado sin
+ejecutar remoto. Linux sin toolchain UWP, consola ni logs de estos juegos:
+sin APPX, mejora FPS, corrección visual o cierre de compatibilidad certificados.
+Manifiesto0.3.9.0 conservado; sin commit/push. Detalle: [Series S y vídeo](xbox_series_s_video.md).
+
+Instalador solicitado: preparado despacho CI con versión0.3.9.1/LTO y verificación
+de firma/contenedor/bloques antes de publicar el artefacto de Actions. YAML y
+releasechecks correctos. Autenticación GH disponible durante el trabajo, sin
+escritura al original. Fork público `correo123456789qwerty-collab/jadyx` creado;
+firma personal en secretos cifrados y pin público explícito para el verificador,
+con su default original conservado. Material privado fuera del árbol. Preparación
+de commits/rama/Actions en ese fork, APPX pendiente; sin publicar releases.
+
 **Reglas de la casa**
 - Los commits van solo a nuestro fork: `origin` = `JulianDr14/jadyx`, fork de
   `eden-emulator/mirror` (el espejo oficial de Eden en GitHub), rama `xbox`.

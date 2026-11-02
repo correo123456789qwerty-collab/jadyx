@@ -30,6 +30,9 @@ en documentación histórica ya no son carpetas de entrega vigentes.
 
 ## Rendimiento y evidencia
 
+- [Vídeo y prioridades Series S](xbox_series_s_video.md): candidato de propiedad/padding,
+  backpressure y fallback FFmpeg; pruebas CPU reproducibles, UWP y juegos pendientes.
+
 - [Compatibilidad de juegos](xbox_compatibility.md): selección de pruebas en consola, reportes de la comunidad y limitaciones; revisada el 28 de octubre de 2026.
 
 - [Operaciones Fermi2D](xbox_fermi2d.md): diagnóstico 0.3.4.9 para identificar operación, ROP, superficies y ruta antes de corregir efectos.
