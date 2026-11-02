@@ -5,16 +5,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <cstring>
+#include <limits>
 #include <string_view>
 #include <vector>
 
 #include "common/assert.h"
 #include "common/logging.h"
-#include "common/scope_exit.h"
 #include "common/settings.h"
-#include "core/memory.h"
 #include "video_core/host1x/ffmpeg.h"
-#include "video_core/memory_manager.h"
 
 extern "C" {
 #ifdef LIBVA_FOUND
@@ -54,32 +52,41 @@ constexpr std::array PreferredGpuDecoders = {
 };
 
 AVPixelFormat GetGpuFormat(AVCodecContext* codec_context, const AVPixelFormat* pix_fmts) {
-    const auto desc = av_pix_fmt_desc_get(codec_context->pix_fmt);
-    if (desc && !(desc->flags & AV_PIX_FMT_FLAG_HWACCEL)) {
+    if (codec_context->hw_device_ctx) {
+        const auto* device =
+            reinterpret_cast<const AVHWDeviceContext*>(codec_context->hw_device_ctx->data);
         for (int i = 0;; i++) {
             const AVCodecHWConfig* config = avcodec_get_hw_config(codec_context->codec, i);
             if (!config) {
                 break;
             }
 
-            for (const auto type : PreferredGpuDecoders) {
-                if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX && config->device_type == type) {
-                    codec_context->pix_fmt = config->pix_fmt;
+            if ((config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) &&
+                config->device_type == device->type) {
+                for (const auto* p = pix_fmts; *p != AV_PIX_FMT_NONE; ++p) {
+                    if (*p == config->pix_fmt) {
+                        return *p;
+                    }
                 }
             }
         }
     }
 
-    for (const AVPixelFormat* p = pix_fmts; *p != AV_PIX_FMT_NONE; ++p) {
-        if (*p == codec_context->pix_fmt) {
-            return codec_context->pix_fmt;
+    // The fallback must be one of the formats offered for this stream. Returning
+    // YUV420P unconditionally violates get_format's contract for other profiles.
+    LOG_INFO(HW_GPU, "Could not find supported GPU pixel format, falling back to CPU decoder");
+    for (const auto* p = pix_fmts; *p != AV_PIX_FMT_NONE; ++p) {
+        if (*p == PreferredCpuFormat) {
+            return *p;
         }
     }
-
-    LOG_INFO(HW_GPU, "Could not find supported GPU pixel format, falling back to CPU decoder");
-    av_buffer_unref(&codec_context->hw_device_ctx);
-    codec_context->pix_fmt = PreferredCpuFormat;
-    return codec_context->pix_fmt;
+    for (const auto* p = pix_fmts; *p != AV_PIX_FMT_NONE; ++p) {
+        const auto* desc = av_pix_fmt_desc_get(*p);
+        if (desc && !(desc->flags & AV_PIX_FMT_FLAG_HWACCEL)) {
+            return *p;
+        }
+    }
+    return AV_PIX_FMT_NONE;
 }
 
 std::string AVError(int errnum) {
@@ -136,16 +143,6 @@ std::vector<u8> ExtractH264ParameterSetExtradata(std::span<const u8> packet) {
 
 }
 
-Packet::Packet(std::span<const u8> data) {
-    m_packet = av_packet_alloc();
-    m_packet->data = const_cast<u8*>(data.data());
-    m_packet->size = static_cast<s32>(data.size());
-}
-
-Packet::~Packet() {
-    av_packet_free(&m_packet);
-}
-
 Frame::Frame() {
     m_frame = av_frame_alloc();
 }
@@ -190,6 +187,9 @@ Decoder::Decoder(Tegra::Host1x::NvdecCommon::VideoCodec codec) {
 }
 
 bool Decoder::SupportsDecodingOnDevice(AVPixelFormat* out_pix_fmt, AVHWDeviceType type) const {
+    if (!m_codec) {
+        return false;
+    }
     for (int i = 0;; i++) {
         const AVCodecHWConfig* config = avcodec_get_hw_config(m_codec, i);
         if (!config) {
@@ -198,7 +198,8 @@ bool Decoder::SupportsDecodingOnDevice(AVPixelFormat* out_pix_fmt, AVHWDeviceTyp
         }
 
         if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX && config->device_type == type) {
-            LOG_INFO(HW_GPU, "Using {} GPU decoder", av_hwdevice_get_type_name(type));
+            LOG_DEBUG(HW_GPU, "{} decoder supports {} GPU decoding", m_codec->name,
+                      av_hwdevice_get_type_name(type));
             *out_pix_fmt = config->pix_fmt;
             return true;
         }
@@ -235,12 +236,13 @@ bool HardwareContext::InitializeForDecoder(DecoderContext& decoder_context, cons
             continue;
         }
 
-        if (!this->InitializeWithType(type)) {
+        if (!decoder.SupportsDecodingOnDevice(&hw_pix_fmt, type)) {
             continue;
         }
 
-        if (decoder.SupportsDecodingOnDevice(&hw_pix_fmt, type)) {
+        if (this->InitializeWithType(type)) {
             decoder_context.InitializeHardwareDecoder(*this, hw_pix_fmt);
+            LOG_INFO(HW_GPU, "Using {} GPU decoder", av_hwdevice_get_type_name(type));
             return true;
         }
     }
@@ -278,7 +280,13 @@ bool HardwareContext::InitializeWithType(AVHWDeviceType type) {
 }
 
 DecoderContext::DecoderContext(const Decoder& decoder) : m_decoder{decoder} {
+    if (!m_decoder.GetCodec()) {
+        return;
+    }
     m_codec_context = avcodec_alloc_context3(m_decoder.GetCodec());
+    if (!m_codec_context) {
+        return;
+    }
     av_opt_set(m_codec_context->priv_data, "tune", "zerolatency", 0);
     m_codec_context->thread_count = 0;
     m_codec_context->thread_type &= ~FF_THREAD_FRAME;
@@ -289,7 +297,6 @@ DecoderContext::DecoderContext(const Decoder& decoder) : m_decoder{decoder} {
 }
 
 DecoderContext::~DecoderContext() {
-    av_buffer_unref(&m_codec_context->hw_device_ctx);
     avcodec_free_context(&m_codec_context);
 }
 
@@ -300,6 +307,14 @@ void DecoderContext::InitializeHardwareDecoder(const HardwareContext& context, A
 }
 
 bool DecoderContext::OpenContext(const Decoder& decoder, std::span<const u8> extradata) {
+    if (!m_codec_context || !decoder.GetCodec()) {
+        LOG_ERROR(HW_GPU, "Video decoder unavailable or context allocation failed");
+        return false;
+    }
+    if (extradata.size() > std::numeric_limits<int>::max() - AV_INPUT_BUFFER_PADDING_SIZE) {
+        LOG_ERROR(HW_GPU, "Video extradata is too large");
+        return false;
+    }
     if (!extradata.empty()) {
         av_freep(&m_codec_context->extradata);
         m_codec_context->extradata = static_cast<u8*>(
@@ -323,7 +338,20 @@ bool DecoderContext::OpenContext(const Decoder& decoder, std::span<const u8> ext
 }
 
 bool DecoderContext::SendPacket(const Packet& packet) {
-    if (const int ret = avcodec_send_packet(m_codec_context, packet.GetPacket()); ret < 0 && ret != AVERROR_EOF && ret != AVERROR(EAGAIN)) {
+    if (!m_codec_context || !packet.GetPacket()) {
+        LOG_ERROR(HW_GPU, "Rejected empty or unallocated video packet");
+        return false;
+    }
+    int ret = avcodec_send_packet(m_codec_context, packet.GetPacket());
+    if (ret == AVERROR(EAGAIN)) {
+        // EAGAIN means the packet was NOT consumed. Preserve decoded output,
+        // then retry this same packet once, as required by the send/receive API.
+        while (auto frame = ReceiveFrameImpl()) {
+            m_ready_frames.push(std::move(frame));
+        }
+        ret = avcodec_send_packet(m_codec_context, packet.GetPacket());
+    }
+    if (ret < 0) {
         LOG_ERROR(HW_GPU, "avcodec_send_packet error: {}", AVError(ret));
         return false;
     }
@@ -332,6 +360,18 @@ bool DecoderContext::SendPacket(const Packet& packet) {
 }
 
 std::shared_ptr<Frame> DecoderContext::ReceiveFrame() {
+    if (!m_ready_frames.empty()) {
+        auto frame = std::move(m_ready_frames.front());
+        m_ready_frames.pop();
+        return frame;
+    }
+    return ReceiveFrameImpl();
+}
+
+std::shared_ptr<Frame> DecoderContext::ReceiveFrameImpl() {
+    if (!m_codec_context) {
+        return {};
+    }
     auto ReceiveImpl = [&](AVFrame* frame) -> int {
         const int ret = avcodec_receive_frame(m_codec_context, frame);
         if (ret < 0 && ret != AVERROR_EOF && ret != AVERROR(EAGAIN)) {
@@ -341,22 +381,32 @@ std::shared_ptr<Frame> DecoderContext::ReceiveFrame() {
     };
 
     std::shared_ptr<Frame> intermediate_frame = std::make_shared<Frame>();
+    if (!intermediate_frame->GetFrame()) {
+        LOG_ERROR(HW_GPU, "Failed to allocate decoded video frame");
+        return {};
+    }
     if (ReceiveImpl(intermediate_frame->GetFrame()) < 0) {
         return {};
     }
 
-    m_final_frame = std::make_shared<Frame>();
-    if (m_codec_context->hw_device_ctx) {
-        m_final_frame->SetFormat(PreferredGpuFormat);
-        if (const int ret = av_hwframe_transfer_data(m_final_frame->GetFrame(), intermediate_frame->GetFrame(), 0); ret < 0) {
+    // A decoder with a hardware context can still output software frames after
+    // format negotiation falls back. Test the frame, not just the device.
+    if (intermediate_frame->IsHardwareDecoded()) {
+        auto final_frame = std::make_shared<Frame>();
+        if (!final_frame->GetFrame()) {
+            LOG_ERROR(HW_GPU, "Failed to allocate transferred video frame");
+            return {};
+        }
+        final_frame->SetFormat(PreferredGpuFormat);
+        if (const int ret = av_hwframe_transfer_data(final_frame->GetFrame(),
+                                                    intermediate_frame->GetFrame(), 0);
+            ret < 0) {
             LOG_ERROR(HW_GPU, "av_hwframe_transfer_data error: {}", AVError(ret));
             return {};
         }
-    } else {
-        m_final_frame = std::move(intermediate_frame);
+        return final_frame;
     }
-
-    return std::move(m_final_frame);
+    return intermediate_frame;
 }
 
 void DecodeApi::Reset() {
@@ -376,6 +426,11 @@ bool DecodeApi::Initialize(Tegra::Host1x::NvdecCommon::VideoCodec codec) {
     this->Reset();
     m_decoder.emplace(codec);
     m_decoder_context.emplace(*m_decoder);
+    if (!m_decoder->GetCodec() || !m_decoder_context->GetCodecContext()) {
+        LOG_ERROR(HW_GPU, "Failed to initialize video decoder for codec {}", codec);
+        this->Reset();
+        return false;
+    }
 
     bool is_mediacodec = false;
 #if defined(__ANDROID__)
@@ -412,6 +467,9 @@ bool DecodeApi::Initialize(Tegra::Host1x::NvdecCommon::VideoCodec codec) {
 
 bool DecodeApi::SendPacket(std::span<const u8> packet_data, const FrameOffsets& offsets,
                            std::optional<FrameDimensions> dimensions) {
+    if (!m_decoder_context) {
+        return false;
+    }
     if (!m_opened) {
         std::vector<u8> extradata;
 #if defined(__ANDROID__)
@@ -440,17 +498,27 @@ bool DecodeApi::SendPacket(std::span<const u8> packet_data, const FrameOffsets& 
         }
         m_opened = true;
     }
+    FFmpeg::Packet packet(packet_data);
+    if (!packet.GetPacket()) {
+        LOG_ERROR(HW_GPU, "Failed to prepare video packet ({} bytes)", packet_data.size());
+        return false;
+    }
+    packet.GetPacket()->pts = m_next_pts;
+    packet.GetPacket()->dts = m_next_pts;
+    if (!m_decoder_context->SendPacket(packet)) {
+        return false;
+    }
     if (!offsets.hidden) {
         m_pending_offsets.push(offsets);
     }
-    FFmpeg::Packet packet(packet_data);
-    packet.GetPacket()->pts = m_next_pts;
-    packet.GetPacket()->dts = m_next_pts;
     ++m_next_pts;
-    return m_decoder_context->SendPacket(packet);
+    return true;
 }
 
 std::optional<DecodeApi::DecodedFrame> DecodeApi::ReceiveFrame() {
+    if (!m_decoder_context) {
+        return std::nullopt;
+    }
     auto frame = m_decoder_context->ReceiveFrame();
     if (!frame) {
         return std::nullopt;

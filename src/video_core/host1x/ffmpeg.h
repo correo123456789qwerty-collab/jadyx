@@ -14,6 +14,7 @@
 
 #include "common/common_funcs.h"
 #include "common/common_types.h"
+#include "video_core/host1x/ffmpeg_packet.h"
 #include "video_core/host1x/nvdec_common.h"
 
 extern "C" {
@@ -44,23 +45,6 @@ class Decoder;
 class HardwareContext;
 class DecoderContext;
 class DeinterlaceFilter;
-
-// Wraps an AVPacket, a container for compressed bitstream data.
-class Packet {
-public:
-    YUZU_NON_COPYABLE(Packet);
-    YUZU_NON_MOVEABLE(Packet);
-
-    explicit Packet(std::span<const u8> data);
-    ~Packet();
-
-    AVPacket* GetPacket() const {
-        return m_packet;
-    }
-
-private:
-    AVPacket* m_packet{};
-};
 
 // Wraps an AVFrame, a container for audio and video stream data.
 class Frame {
@@ -192,9 +176,11 @@ public:
     }
 
 private:
+    std::shared_ptr<Frame> ReceiveFrameImpl();
+
     const Decoder& m_decoder;
     AVCodecContext* m_codec_context{};
-    std::shared_ptr<Frame> m_final_frame{};
+    std::queue<std::shared_ptr<Frame>> m_ready_frames;
     bool m_decode_order{};
 };
 
@@ -222,7 +208,7 @@ public:
     void Reset();
 
     bool UsingDecodeOrder() const {
-        return m_decoder_context->UsingDecodeOrder();
+        return m_decoder_context && m_decoder_context->UsingDecodeOrder();
     }
 
     bool SendPacket(std::span<const u8> packet_data, const FrameOffsets& offsets,

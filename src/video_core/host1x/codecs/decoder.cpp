@@ -45,9 +45,9 @@ void Decoder::Decode() {
     }
 
     // Send assembled bitstream to decoder.
-    if (!decode_api.SendPacket(packet_data, offsets, GetFrameDimensions())) {
-        return;
-    }
+    // A rejected packet may still have caused older output to be drained.
+    // Deliver that output even when the current bitstream cannot be accepted.
+    decode_api.SendPacket(packet_data, offsets, GetFrameDimensions());
 
     auto push = [&](u64 luma, std::shared_ptr<FFmpeg::Frame> frame) {
         if (UsingDecodeOrder()) {
