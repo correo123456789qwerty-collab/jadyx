@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -19,8 +20,9 @@ namespace FFmpeg {
 class Packet {
 public:
     explicit Packet(std::span<const std::uint8_t> data) {
-        if (data.empty() ||
-            data.size() > std::numeric_limits<int>::max() - AV_INPUT_BUFFER_PADDING_SIZE) {
+        constexpr auto max_size = static_cast<std::size_t>(std::numeric_limits<int>::max() -
+                                                           AV_INPUT_BUFFER_PADDING_SIZE);
+        if (data.empty() || data.size() > max_size) {
             return;
         }
         m_packet = av_packet_alloc();

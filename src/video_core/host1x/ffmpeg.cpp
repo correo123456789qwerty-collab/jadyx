@@ -311,7 +311,9 @@ bool DecoderContext::OpenContext(const Decoder& decoder, std::span<const u8> ext
         LOG_ERROR(HW_GPU, "Video decoder unavailable or context allocation failed");
         return false;
     }
-    if (extradata.size() > std::numeric_limits<int>::max() - AV_INPUT_BUFFER_PADDING_SIZE) {
+    constexpr auto max_extradata_size = static_cast<std::size_t>(
+        std::numeric_limits<int>::max() - AV_INPUT_BUFFER_PADDING_SIZE);
+    if (extradata.size() > max_extradata_size) {
         LOG_ERROR(HW_GPU, "Video extradata is too large");
         return false;
     }
