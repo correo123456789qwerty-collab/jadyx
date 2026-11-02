@@ -1,5 +1,15 @@
 # AGENTS.md: guía para agentes de IA en Jadyx (fork de JulianDr14)
 
+Entrega personal0.3.9.1 completada2nov2026: run41523693476 todoPASS, fuentea915a1e,
+WindowsUWPx64Release/LTO, Mesa ytestsactualizador/vídeo correctos. APPXfirmado
+en build-uwp/package/jadyx.appx, dependenciaVCLibs/certpúblico al lado; símbolos
+EXE/PDB en build-uwp/symbols/0.3.9.1. CMS/keypin/contenedor verificadosenWindows;
+SHA/CRC/35payloads772bloques verificados trasdescarga. SHA256APPX
+72014e9855e12a518ce957b166cb728d892d5d10d07f6ad2fa21d9bd6024460a.
+AlternativaVS2022/sinLTO iniciada41528123127 ycancelada traséxito optimizado.
+Sininstalar/probar juegos enXbox; no FPSni compatibilidad certificados. Firma
+personal, sinreleasepública. Detalle docs/xbox/xbox_series_s_video.md.
+
 Entrega personal solicitada por el usuario: el repositorio de esta compilación
 es `correo123456789qwerty-collab/jadyx`, fork público creado para poder ejecutar
 Actions sin permisos de escritura en JulianDr14/jadyx. En este checkout,

@@ -4,6 +4,18 @@ Cuaderno de trabajo del port: cómo compilar, en qué fase vamos y lo que hemos 
 Los docs "de verdad" son [`uwp_build.md`](uwp_build.md) (toolchain) y [`xbox_deploy.md`](xbox_deploy.md)
 (empaquetar y desplegar). Aquí va el resumen rápido y todo lo que no cabe en ellos.
 
+Entrega personal Series S0.3.9.1 completada: [CI41523693476](https://github.com/correo123456789qwerty-collab/jadyx/actions/runs/41523693476),
+fuentea915a1e2470cbf8b09626e0d7eae2ba638a7d02e, todos los jobs correctos.
+UWPx64Release/LTO, Mesa, testsactualizador yvídeo; firmaCMS/pin personal/contenedor
+enWindows ySHA/CRC/35payloads772bloques trasdescarga correctos. Entrega única
+build-uwp/package/jadyx.appx, VCLibs/certpúblico al lado, EXE/PDB en symbols/0.3.9.1.
+SHA256APPX72014e9855e12a518ce957b166cb728d892d5d10d07f6ad2fa21d9bd6024460a.
+Primer gateUbuntu usaba fmt9 incompatible conlogger: se usa fmt12.1.0 de cpmfile
+conhashSHA512 comprobado. PrimerUWP rechazó comparación signed/unsignedC4388;
+límites Packet/extradata ahora std::size_t explícitos, gate -Werror=sign-compare
+yLinux/MSVC pasan. AlternativaVS2022/sinLTO iniciada ycancelada traséxito.
+Sin pruebas de instalación/gameplay/FPS enSeries. [Detalle y evidencia](xbox_series_s_video.md).
+
 2nov2026, `feature/series-s-video-stability`: prioridad usuario Final Fantasy
 Resonance, cierre tras cinemática Qliphah y finalmente FPS Mario Kart 8 Deluxe,
 todos reportados en Series S/0.3.9.0. Se conserva y completa Packet pendiente:

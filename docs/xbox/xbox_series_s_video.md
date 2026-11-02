@@ -2,7 +2,30 @@
 
 2 de noviembre de 2026. Rama `feature/series-s-video-stability`, basada en
 `52c95fae381fbc30a0aac3d13dba0850fa774b84` (main remoto comprobado al iniciar).
-Estado: candidato de código fuente; todavía no es una entrega validada en Xbox.
+Estado: instalador personal 0.3.9.1 generado y verificado; instalación y gameplay
+en Xbox todavía pendientes.
+
+## Entrega completada
+
+- Instalador: `build-uwp/package/jadyx.appx` (16.648.541 bytes).
+- Dependencia: `build-uwp/package/Microsoft.VCLibs.x64.14.00.appx`.
+- Certificado público: `build-uwp/package/jadyx.cer`.
+- Símbolos EXE/PDB: `build-uwp/symbols/0.3.9.1/`.
+- [Compilación de Windows y todos los gates correctos](https://github.com/correo123456789qwerty-collab/jadyx/actions/runs/41523693476).
+  Fuente compilada: `a915a1e2470cbf8b09626e0d7eae2ba638a7d02e`, UWP x64 Release,
+  LTO activado. La firma es personal, con el certificado del fork del usuario.
+- SHA256 APPX: `72014e9855e12a518ce957b166cb728d892d5d10d07f6ad2fa21d9bd6024460a`.
+
+El job Windows verificó CMS, pin de firma, metadata y contenedor firmado antes
+de subir el artefacto. Tras descargarlo se comprobaron todos los SHA256 del
+artefacto, identidad/versión/arquitectura, certificado esperado, CRC ZIP y los
+772 bloques de sus 35 payloads. Los informes de vídeo locales y el de CI tienen
+SHA256 coincidentes con el código de vídeo del instalador.
+
+Evidencia local: `test-results/series-s-video/installer-verification.json`,
+`installer-run.json`, `video-ci-final/sanitized.json` y `installer-artifact/`.
+No se ha instalado en Xbox ni probado juegos; compilar y firmar no certifica
+resolver los reportes ni mejorar FPS. No se publicó una release.
 
 ## Objetivo y alcance
 
@@ -78,13 +101,20 @@ Resultados locales:
   bajo backpressure; el candidato pasa. Para compilar ese control aislado solo
   se retiraron dos includes no utilizados que arrastraban Boost.
 
-Se añadió el job `video decoder regressions` a CI. Su ejecución remota y el build
-UWP siguen pendientes; las pruebas anteriores son ejecuciones locales.
+El job `video decoder regressions` pasa también en CI, con GCC 13.3, FFmpeg 6.1
+y fmt 12.1.0. Inicialmente Ubuntu aportaba fmt 9, incompatible con el logger del
+proyecto. El workflow reutilizable `video.yml` compila la versión fmt fijada en
+`cpmfile.json` y comprueba el SHA512 del archivo de fuentes antes de usarla.
+
+El primer UWP detectó C4388 en los límites de Packet; se tiparon explícitamente
+como `std::size_t`, también en extradata. El gate con `-Werror=sign-compare`, los
+tests CPU y la compilación MSVC posterior pasan.
 
 ## Compilación y prueba en Xbox
 
-Este equipo tiene Linux y carece del toolchain Windows/UWP, por lo que no se ha
-generado, firmado ni instalado un APPX. El manifiesto permanece en 0.3.9.0.
+Este equipo tiene Linux y carece del toolchain Windows/UWP; se utilizó GitHub
+Actions para generar el APPX. El manifiesto fuente permanece en 0.3.9.0 y el
+manifiesto empaquetado es 0.3.9.1 por override explícito.
 En Windows, con los requisitos de [uwp_build.md](uwp_build.md) y Mesa disponibles:
 
 ```powershell
@@ -123,7 +153,8 @@ variable pública `JADYX_PACKAGE_PUBLIC_KEY`.
 La firma personal no es la firma de distribución de JulianDr14. Se mantiene la
 identidad del paquete y se entrega el certificado público junto al APPX; la
 instalación/actualización y conservación de datos deben validarse en consola.
-Todavía no se ha producido un APPX ni publicado una release.
+El APPX verificado se entrega en las rutas indicadas arriba. No se ha publicado
+una release ni ejecutado instalación o gameplay en la consola.
 
 ### Alternativa de compilación
 
@@ -138,8 +169,9 @@ La caché Mesa se separa por imagen para conservar la coherencia del toolchain.
 gh workflow run ci.yml --repo correo123456789qwerty-collab/jadyx --ref feature/series-s-video-stability -f package=true -f package_version=0.3.9.1 -f windows_runner=windows-2022 -f lto=false
 ```
 
-El intento optimizado continúa activo al preparar esta opción. No se ha
-diagnosticado un fallo de LTO ni medido el rendimiento de la alternativa.
+La alternativa se ejecutó como [run41528123127](https://github.com/correo123456789qwerty-collab/jadyx/actions/runs/41528123127)
+y se canceló al quedar verificado el instalador optimizado. No se ha diagnosticado
+un fallo de LTO ni medido el rendimiento de la alternativa.
 
 Para continuar, recoger primero el log 0.3.9.0 de Final Fantasy y Qliphah mediante
 «Comprimir y descargar logs» en el portal. Anotar actualización del juego, escena
