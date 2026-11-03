@@ -30,6 +30,15 @@ std::vector<u32> MakeGraphicsShaderKey(Key key) {
     key.state.color_formats = {};
     key.state.depth_enabled.Assign(0);
     key.state.depth_format.Assign(0);
+    // FixedPipelineState::Size() excludes this tail when XFB is off. The shader key stores
+    // complete bytes, so normalize the inactive tail rather than retaining stale registers.
+    if (key.state.xfb_enabled == 0) {
+        key.state.xfb_state = {};
+        key.state.depth_bounds_min = 0;
+        key.state.depth_bounds_max = 0;
+        key.state.line_stipple_factor = 0;
+        key.state.line_stipple_pattern = 0;
+    }
     std::vector<u32> words(sizeof(Key) / sizeof(u32));
     std::memcpy(words.data(), &key, sizeof(Key));
     return words;

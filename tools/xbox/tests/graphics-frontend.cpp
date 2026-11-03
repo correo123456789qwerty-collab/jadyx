@@ -26,6 +26,14 @@ int main() try {
         Maxwell::ComparisonOp::Always_GL));
     key.state.point_size = std::bit_cast<u32>(1.0f);
     const auto base_key = MakeGraphicsShaderKey(key);
+    auto inactive_xfb = key;
+    std::memset(&inactive_xfb.state.xfb_state, 0x5a, sizeof(inactive_xfb.state.xfb_state));
+    assert(MakeGraphicsShaderKey(inactive_xfb) == base_key);
+    auto active_xfb = inactive_xfb;
+    active_xfb.state.xfb_enabled.Assign(1);
+    inactive_xfb.state.xfb_enabled.Assign(1);
+    reinterpret_cast<u8*>(&active_xfb.state.xfb_state)[0] ^= 1;
+    assert(MakeGraphicsShaderKey(active_xfb) != MakeGraphicsShaderKey(inactive_xfb));
     // Changing a real shader input must split the preparation key.
     for (u32 field = 0; field < 12; ++field) {
         auto changed = key;
@@ -89,6 +97,11 @@ int main() try {
         variant.state.color_formats[0] = static_cast<u8>(i);
         variant.state.depth_enabled.Assign(i & 1);
         variant.state.depth_format.Assign(i & 31);
+        std::memset(&variant.state.xfb_state, static_cast<int>(i), sizeof(variant.state.xfb_state));
+        variant.state.depth_bounds_min = i;
+        variant.state.depth_bounds_max = i + 1;
+        variant.state.line_stipple_factor = i;
+        variant.state.line_stipple_pattern = i + 2;
         assert(MakeGraphicsShaderKey(variant) == base_key);
         assert(variant != key); // PSO identity is still distinct.
         auto start = std::chrono::steady_clock::now();
