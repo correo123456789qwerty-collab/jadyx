@@ -29,13 +29,16 @@ El candidato conserva una caché de preparación separada de la identidad PSO:
 - Máximo 4 MiB/128 entradas, compartidas durante compilación, sin mutex durante
   la traducción; se vacía con el guard de memoria ya existente. Los captures
   liberan referencias al entorno y mapas que contenían punteros IR temporales.
+  Al desactivarse por presión se usa traducción directa, sin registrar consultas
+  que no podrían reutilizarse.
 - El PSO usa siempre su clave completa y los draws siguen esperando su pipeline
   exacto. No se cambian shaders, precisión, contenido, presupuestos JIT/DRAM ni
   workers. Los dumps de diagnóstico fuerzan la ruta de traducción normal.
 
 Pruebas: `shader-environment-record.cpp` (mutaciones y replay, Linux optimizado
 y ASan/UBSan pasan); `graphics-frontend.cpp` compara 128 variantes de shaders
-Maxwell sintéticos con traducción directa, SPIR-V/metadata exactos, límites y
+Maxwell sintéticos (uniformes y salidas de vértice/color) con traducción directa,
+SPIR-V/metadata exactos, límites y
 tiempos aislados. Este último se enlaza con las bibliotecas UWP reales en CI;
 su resultado y entrega quedan pendientes al iniciar el candidato. El cache
 genérico pasa localmente colisiones, 16 clientes concurrentes, retry y LRU.

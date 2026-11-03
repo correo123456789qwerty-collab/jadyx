@@ -10,6 +10,15 @@ public:
     explicit TestEnvironment(Shader::Stage shader_stage = Shader::Stage::VertexB) {
         stage = shader_stage;
         code.assign(1056, 0x50b0000000070f00ULL); // Maxwell NOP, always predicate.
+        // LDC.32 R0, c[0][0]: a real uniform read kept live by the stage's output.
+        code[0] = 0xef9400000007ff00ULL;
+        if (stage == Shader::Stage::VertexB) {
+            // AST Position.x, R0, with direct addressing and vertex/index RZ.
+            code[1] = 0xeff000000007ff00ULL | (u64{255} << 39) | (u64{112} << 20);
+            sph.vtg.omap_systemb.position_x.Assign(1);
+        } else if (stage == Shader::Stage::Fragment) {
+            sph.ps.omap.target = 1; // EXIT exports R0 as RT0.x.
+        }
         code.back() = 0xe30000000007000fULL; // EXIT; control words are skipped by Location.
         // The last word must not be a scheduler control word.
         assert(((code.size() - 1) * 8 + sizeof(sph)) % 32 != 0);

@@ -1303,13 +1303,15 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
                             IsDumpedShader(key.unique_hashes[5]);
     const bool diagnostics = Settings::values.dump_guest_shaders ||
         std::ranges::any_of(key.unique_hashes, IsDumpedShader);
-    const auto prepare = [&] {
+    const auto prepare = [&](bool record_inputs = true) {
         return PrepareGraphicsShaders(pools, key, envs, profile, host_info,
-                                      compiler.SupportsStreamOutput());
+                                      compiler.SupportsStreamOutput(), record_inputs);
     };
     std::shared_ptr<const PreparedGraphicsShaders> prepared;
-    if (diagnostics) {
-        prepared = std::make_shared<const PreparedGraphicsShaders>(prepare());
+    if (diagnostics || !frontend_reuse_enabled.load(std::memory_order_relaxed)) {
+        // When the optional cache is disabled, keep the direct path's allocation and query
+        // costs. Recording inputs that cannot be reused would only add memory pressure.
+        prepared = std::make_shared<const PreparedGraphicsShaders>(prepare(false));
         frontend_misses.fetch_add(1, std::memory_order_relaxed);
     } else {
         const auto cached = prepared_shaders.Get(MakeGraphicsShaderKey(key), [&] {

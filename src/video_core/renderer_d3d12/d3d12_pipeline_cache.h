@@ -149,10 +149,12 @@ public:
         case OptionalCacheGate::Action::Trim:
             linked_shaders.SetBudget(0);
             prepared_shaders.SetBudget(0);
+            frontend_reuse_enabled.store(false, std::memory_order_relaxed);
             break;
         case OptionalCacheGate::Action::Restore:
             linked_shaders.SetBudget(decltype(linked_shaders)::DEFAULT_BUDGET);
             prepared_shaders.SetBudget(decltype(prepared_shaders)::DEFAULT_BUDGET);
+            frontend_reuse_enabled.store(true, std::memory_order_relaxed);
             break;
         case OptionalCacheGate::Action::None:
             break;
@@ -267,6 +269,7 @@ private:
 
     LinkedShaderCache<ChargedDxilStages> linked_shaders;
     LinkedShaderCache<PreparedGraphicsShaders> prepared_shaders;
+    std::atomic_bool frontend_reuse_enabled{true};
     std::atomic<u64> frontend_hits{};
     std::atomic<u64> frontend_misses{};
     std::atomic<u64> frontend_rejected{};

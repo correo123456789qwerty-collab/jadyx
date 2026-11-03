@@ -64,6 +64,8 @@ int main() try {
     auto measure = [](const PreparedGraphicsShaders& value) { return value.SizeBytes(); };
     const auto cached = cache.Get(base_key, [&] { return build(key); }, measure);
     assert(!cached.value->spirv[0].empty() && !cached.value->spirv[4].empty());
+    assert((cached.value->infos[0]->constant_buffer_mask & 1) != 0);
+    assert((cached.value->infos[4]->constant_buffer_mask & 1) != 0);
     assert(cached.value->Matches(envs));
     double uncached_us{}, reused_us{};
     for (u32 i = 1; i <= 128; ++i) {
