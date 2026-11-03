@@ -59,6 +59,13 @@ int main() try {
     auto build = [&](const auto& variant, bool record = true) {
         ++translations;
         pools.ReleaseContents();
+        // Production creates fresh environments per pipeline. Never carry IR-pointer caches
+        // from a reference translation across a pool reset in this standalone fixture.
+        for (auto* env : envs) {
+            env->cbuf_word_cache.clear();
+            env->handle_cache.clear();
+            env->track_cache.clear();
+        }
         return PrepareGraphicsShaders(pools, variant, envs, profile, host, false, record);
     };
     auto measure = [](const PreparedGraphicsShaders& value) { return value.SizeBytes(); };
