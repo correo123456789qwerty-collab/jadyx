@@ -43,16 +43,6 @@ void LogExportTests(Jadyx::NetworkPortal& portal,httplib::Client& client,
     Check(Status(client.Post("/api/v1/logs/export","{}","application/json"))==401,"logs require pairing");
     Check(Status(client.Get("/api/v1/logs/archive"))==401,"anonymous logs rejected");
     Check(Status(client.Post("/api/v1/logs/download",authenticated,"{}","application/json"))==409,"logs not ready rejected");
-    Check(Status(client.Post("/api/v1/logs/export",authenticated,"{}","application/json"))==202,"async logs preparation");
-    Check(Status(client.Post("/api/v1/logs/export",authenticated,"{}","application/json"))==409,"only one export worker");
-    // Granted while compressing: the archive streams to the client as it is written.
-    auto early=client.Post("/api/v1/logs/download",authenticated,"{}","application/json");
-    Check(Status(early)==200,"grant download while compressing");
-    const auto early_grant=Json::parse(early->body);
-    const bool streaming=early_grant.at("streaming").get<bool>();
-    auto streamed=client.Get(early_grant.at("download").get<std::string>());
-    Check(Status(streamed)==200,"download followed from the start of the export");
-    Check(!streaming||streamed->get_header_value("Transfer-Encoding")=="chunked","streamed while compressing");
     const auto wait=[&] {
         Json value;
         const auto deadline=std::chrono::steady_clock::now()+15s;
@@ -64,6 +54,27 @@ void LogExportTests(Jadyx::NetworkPortal& portal,httplib::Client& client,
         }while(std::chrono::steady_clock::now()<deadline);
         Check(false,"logs preparation deadline");return value;
     };
+    Check(Status(client.Post("/api/v1/logs/export",authenticated,"{}","application/json"))==202,"async logs preparation");
+    // A fast export may finish between two HTTP requests. A sequential restart is legal;
+    // retry until the second request overlaps an active run and actually tests exclusion.
+    bool overlap_rejected=false;
+    for(unsigned attempt=0;attempt<50&&!overlap_rejected;++attempt){
+        const auto second=Status(client.Post("/api/v1/logs/export",authenticated,"{}","application/json"));
+        overlap_rejected=second==409;
+        if(overlap_rejected)break;
+        Check(second==202,"completed export may restart sequentially");
+        Check(wait().at("phase")=="ready","sequential replacement completes");
+        Check(Status(client.Post("/api/v1/logs/export",authenticated,"{}","application/json"))==202,"retry overlapping export");
+    }
+    Check(overlap_rejected,"only one export worker while active");
+    // Granted while compressing: the archive streams to the client as it is written.
+    auto early=client.Post("/api/v1/logs/download",authenticated,"{}","application/json");
+    Check(Status(early)==200,"grant download while compressing");
+    const auto early_grant=Json::parse(early->body);
+    const bool streaming=early_grant.at("streaming").get<bool>();
+    auto streamed=client.Get(early_grant.at("download").get<std::string>());
+    Check(Status(streamed)==200,"download followed from the start of the export");
+    Check(!streaming||streamed->get_header_value("Transfer-Encoding")=="chunked","streamed while compressing");
     auto state=wait();
     if(state.at("phase")!="ready")std::fprintf(stderr,"logs: %s\n",state.dump().c_str());
     Check(state.at("phase")=="ready"&&state.at("files")==4,"all log files prepared including live writer");
