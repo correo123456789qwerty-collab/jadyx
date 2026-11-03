@@ -12,7 +12,8 @@ en documentación histórica ya no son carpetas de entrega vigentes.
 - [Cuaderno del proyecto](xbox_internal.md): estado, decisiones, trampas y resultados de pruebas.
 - [Compilación UWP](uwp_build.md): toolchain y configuración inicial; conserva el contexto histórico de la fase 2.
 - [Instaladores rápidos](xbox_fast_installer.md): reempaquetado de un build validado en 72 s
-  medidos, firma/verificación conservadas y preflight Windows antes del build completo.
+  medidos; árbol Ninja y LTCG incremental reducen las fases de construcción de
+  18 min 31 s a 6 min 17 s en una edición real, manteniendo firma y validaciones.
 - [Despliegue en Series](xbox_deploy.md): empaquetado, instalación y diagnóstico de activación.
 
 ## Diseño y funciones
@@ -32,12 +33,12 @@ en documentación histórica ya no son carpetas de entrega vigentes.
 
 ## Rendimiento y evidencia
 
-- [Final Fantasy Resonance en 0.3.9.1](xbox_final_fantasy.md): PANIC y accesos no
-  mapeados confirmados; corrección reproducida de reinicialización de tablas y
-  candidato para preservar logs/código de aborto. Causalidad y Series pendientes.
+- [Final Fantasy Resonance y entrega 0.3.9.3](xbox_final_fantasy.md): reporte de
+  0.3.9.2, preparación de shaders reutilizable y APPX verificado. FPS y fallos
+  visuales de la nueva versión pendientes de comprobar en Series.
 
-- [Vídeo y prioridades Series S](xbox_series_s_video.md): candidato de propiedad/padding,
-  backpressure y fallback FFmpeg; pruebas CPU reproducibles, UWP y juegos pendientes.
+- [Vídeo y prioridades Series S](xbox_series_s_video.md): propiedad/padding,
+  backpressure y fallback FFmpeg; historial de pruebas y entrega vigente.
 
 - [Compatibilidad de juegos](xbox_compatibility.md): selección de pruebas en consola, reportes de la comunidad y limitaciones; revisada el 28 de octubre de 2026.
 

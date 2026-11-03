@@ -2,10 +2,12 @@
 
 2 de noviembre de 2026. Rama `feature/series-s-video-stability`, basada en
 `52c95fae381fbc30a0aac3d13dba0850fa774b84` (main remoto comprobado al iniciar).
-Estado: entrega personal vigente 0.3.9.2, UWP x64 Release/LTO, con CI y firma
-verificadas. El reporte de 0.3.9.1 confirmó fallos gráficos y PANIC de Final
-Fantasy; la nueva prueba en Series S queda pendiente.
-[Revisión de logs, cambios y entrega 0.3.9.2](xbox_final_fantasy.md).
+Estado actualizado el 3 de noviembre: entrega personal vigente **0.3.9.3**,
+fuente `466c0d3`, UWP x64 Release/LTO, con CI y firma verificadas. El reporte
+0.3.9.2 confirma que combates y transiciones continúan, pero persisten tirones,
+rendimiento inestable y fallos visuales. La nueva versión prioriza reducir
+preparación repetida de shaders; su prueba en Series S queda pendiente.
+[Revisión de logs, cambios y entrega 0.3.9.3](xbox_final_fantasy.md).
 
 ## Entrega inicial 0.3.9.1 (histórico)
 

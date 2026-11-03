@@ -1,5 +1,22 @@
 # AGENTS.md: guía para agentes de IA en Jadyx (fork de JulianDr14)
 
+Estado vigente, 3 nov 2026: entrega personal **0.3.9.3** completada, fuente
+`466c0d391caa7b1256d66a53f4db65e54d5f8954`, CI `41573230511` todo requerido PASS.
+APPX único `build-uwp/package/jadyx.appx`, 16.278.415 B, SHA256
+`fd01d2e03303f4a218952cceb09dafd499d58e613dfb881f30f5ee4c9d354820`.
+Firma PKCS7/pin/digests/CRC/35 payloads/753 bloques verificados tras descarga;
+mismo certificado 0.3.9.2. EXE/PDB cotejados en `build-uwp/symbols/0.3.9.3/`.
+Prioridad rendimiento FF: caché frontend 4 MiB/128 entradas, replay exacto de
+consultas, PSO completo intacto. Gate UWP real: 128 variantes equivalentes,
+15 mutaciones rechazadas y trim; sintético ~85→11 µs, NO FPS. Sin prueba de
+esta versión en Series ni corrección visual/RAM certificadas.
+Instalador: árbol Ninja por SHA256/fechas validadas y modo LTCG corregido
+(CMake añadía /LTCG después de /LTCG:INCREMENTAL); /GL conservado y verificado.
+Edición real: fases de construcción 18m31→6m17, excluye cachés/otros gates;
+CI final total 17m05, empaquetado ~47s. Reempaquetado previo mismo código 72s.
+Detalles `docs/xbox/xbox_final_fantasy.md`, `xbox_fast_installer.md`; evidencia
+`test-results/final-fantasy-0.3.9.3/`. Las notas siguientes son históricas.
+
 0.3.9.3 CIinicial41558482021: Linux/Mesa/buildUWP pasan; harnessexigeVMAobj
 ausenteconVulkanOFF,corregidocondicional ygate movidoantesdeenlaceEXE. Noentrega.
 LTOsolo noevita8minreplay de1550hits/17misses más6m41enlace. Se implementaárbol

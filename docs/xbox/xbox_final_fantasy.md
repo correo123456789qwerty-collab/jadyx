@@ -1,6 +1,27 @@
-# Final Fantasy Resonance: primera revisión de 0.3.9.1
+# Final Fantasy Resonance: rendimiento y estabilidad
 
-## Reporte 0.3.9.2 y candidato 0.3.9.3 — 2 nov 2026
+## Entrega 0.3.9.3 verificada — 3 nov 2026
+
+Instalador vigente: `build-uwp/package/jadyx.appx`, **16.278.415 bytes**.
+Fuente compilada: `466c0d391caa7b1256d66a53f4db65e54d5f8954`.
+[CI 41573230511](https://github.com/correo123456789qwerty-collab/jadyx/actions/runs/41573230511)
+completo correcto: Linux, Mesa, Windows UWP Release/LTO, frontend de shaders,
+memoria, actualizador, portal TCP/PAX y paquete firmado. El manifiesto fuente
+permanece en 0.3.9.0; CI aplica explícitamente la versión de entrega 0.3.9.3.
+
+SHA256 APPX: `fd01d2e03303f4a218952cceb09dafd499d58e613dfb881f30f5ee4c9d354820`.
+Tras descargarlo se verificaron independientemente PKCS7 con OpenSSL, pin del
+firmante, certificado, digests del contenedor, CRC y los 753 bloques de 35
+payloads. Conserva el certificado de 0.3.9.2 y el arranque de biblioteca.
+EXE empaquetado y PDB de símbolos coinciden con los artefactos del compilador;
+ambos quedan en `build-uwp/symbols/0.3.9.3/`. Evidencia local:
+`test-results/final-fantasy-0.3.9.3/{installer,symbols,delivery}-verification.json`.
+
+Se entrega una optimización concreta de preparación repetida de shaders.
+**No hay todavía prueba de esta versión en Series S**: no se certifican nuevos
+FPS, eliminación de parpadeo/tambaleo/texturas incorrectas ni ahorro de RAM.
+
+## Reporte 0.3.9.2 y cambio de 0.3.9.3
 
 El usuario probó desde el principio en Series: menú 30 FPS/~3,7 GB; vídeo inicial
 ~21–23 FPS/~4,2 GB; escenas y exploración ~20–30 FPS, parpadeo/tambaleo y texturas
@@ -40,13 +61,27 @@ y ASan/UBSan pasan); `graphics-frontend.cpp` compara 128 variantes de shaders
 Maxwell sintéticos (uniformes y salidas de vértice/color) con traducción directa,
 SPIR-V/metadata exactos, límites y
 tiempos aislados. Este último se enlaza con las bibliotecas UWP reales en CI;
-su resultado y entrega quedan pendientes al iniciar el candidato. El cache
+el gate Windows ya pasa. El cache
 genérico pasa localmente colisiones, 16 clientes concurrentes, retry y LRU.
+
+Windows confirmó 128 variantes con uniformes y salidas de vértice/color, SPIR-V
+y bindings idénticos, las 15 mutaciones de entradas rechazadas y vaciado bajo
+presión. En el CI final: 85,1789→11,2109 µs por preparación y
+84,993→11,0266 µs tras el segundo enlace: aproximadamente 7,6 veces menos
+tiempo en ese componente al reutilizar su resultado.
+Son tiempos del frontend sintético en el mismo proceso, no una comparación
+de versiones del juego ni FPS. Una entrada de esa fixture ocupa 86.972 bytes.
+
+La clave normaliza la cola de estado XFB cuando está desactivado, tal como la
+identidad gráfica original ignora esa cola. También comparte el frontend antes
+de la reducción de samplers, que Mesa aplica posteriormente al enlazar DXIL.
+La firma raíz, las opciones DXIL y el PSO siguen seleccionándose con la clave
+original; las pruebas diferenciales incluyen esas variaciones.
 
 La optimización tiene un mecanismo concreto para reducir trabajo repetido;
 no elimina el primer shader desconocido ni toda creación PSO del driver. No
 certifica aún FPS, corrección de parpadeo/texturas, Megafulgor ni ahorro neto de
-RAM en Series. El instalador solo se sustituye tras pasar build, gates y firma.
+RAM en Series. El instalador se sustituyó después de pasar build, gates y firma.
 
 Investigación: Microsoft separa bytecode y estado PSO en
 [Pipelines and Shaders](https://learn.microsoft.com/en-us/windows/win32/direct3d12/pipelines-and-shaders-with-directx-12)
@@ -58,10 +93,9 @@ restricciones del driver Series. El objetivo es ahorrar la traducción anterior.
 Instaladores: además de la ruta de reempaquetado de 72 s ya medida, se implementa
 retención del estado LTCG optimizado; ver [instaladores rápidos](xbox_fast_installer.md).
 
-2 de noviembre de 2026. Rama `feature/series-s-video-stability`.
-El usuario prioriza este juego; Mario Kart y Qliphah quedan para después.
-Entrega personal 0.3.9.2 completada y verificada; detalles y hash al final.
-La validación de este candidato en Series S sigue pendiente.
+Rama `feature/series-s-video-stability`. El usuario prioriza este juego;
+Mario Kart y Qliphah quedan para después. A continuación se conserva el
+diagnóstico histórico de 0.3.9.1 y las entregas anteriores.
 
 ## Evidencia recibida
 

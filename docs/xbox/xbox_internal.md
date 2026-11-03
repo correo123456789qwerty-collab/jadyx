@@ -4,6 +4,22 @@ Cuaderno de trabajo del port: cómo compilar, en qué fase vamos y lo que hemos 
 Los docs "de verdad" son [`uwp_build.md`](uwp_build.md) (toolchain) y [`xbox_deploy.md`](xbox_deploy.md)
 (empaquetar y desplegar). Aquí va el resumen rápido y todo lo que no cabe en ellos.
 
+Entrega vigente **0.3.9.3**, 3 nov 2026: fuente `466c0d3`,
+[CI 41573230511 completo correcto](https://github.com/correo123456789qwerty-collab/jadyx/actions/runs/41573230511).
+Prioridad del usuario: rendimiento de Final Fantasy tras el reporte 0.3.9.2.
+Reutilización acotada de preparación Maxwell→SPIR-V con replay exacto de
+consultas; PSO completo conservado. Gate real UWP: 128 variantes equivalentes,
+15 mutaciones rechazadas, presión/trim; frontend sintético ~85→11 µs, no FPS.
+APPX firmado en `build-uwp/package/jadyx.appx`, 16.278.415 B, SHA256
+`fd01d2e03303f4a218952cceb09dafd499d58e613dfb881f30f5ee4c9d354820`.
+PKCS7/pin/digests/CRC/753 bloques verificados tras descarga, mismo certificado;
+EXE/PDB cotejados y archivados en `build-uwp/symbols/0.3.9.3/`.
+Árbol Ninja con fuentes validadas por SHA256 y LTCG incremental efectivo:
+fases de construcción 18 min 31 s→6 min 17 s, excluyendo cachés y otros gates;
+CI completo final 17 min 5 s. Detalles: [Final Fantasy](xbox_final_fantasy.md)
+e [instaladores](xbox_fast_installer.md). No hay FPS/validación visual/RAM de
+esta versión en Series. Las anotaciones siguientes conservan el historial.
+
 Entrega personal Series S0.3.9.1 completada: [CI41523693476](https://github.com/correo123456789qwerty-collab/jadyx/actions/runs/41523693476),
 fuentea915a1e2470cbf8b09626e0d7eae2ba638a7d02e, todos los jobs correctos.
 UWPx64Release/LTO, Mesa, testsactualizador yvídeo; firmaCMS/pin personal/contenedor
