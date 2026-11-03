@@ -2,11 +2,12 @@
 
 2 de noviembre de 2026. Rama `feature/series-s-video-stability`, basada en
 `52c95fae381fbc30a0aac3d13dba0850fa774b84` (main remoto comprobado al iniciar).
-Estado: instalador personal 0.3.9.1 generado y verificado; el usuario ya lo probó
-en Series S. Final Fantasy sigue con fallos gráficos y termina en un PANIC del
-guest. [Revisión de logs y candidato local posterior](xbox_final_fantasy.md).
+Estado: entrega personal vigente 0.3.9.2, UWP x64 Release/LTO, con CI y firma
+verificadas. El reporte de 0.3.9.1 confirmó fallos gráficos y PANIC de Final
+Fantasy; la nueva prueba en Series S queda pendiente.
+[Revisión de logs, cambios y entrega 0.3.9.2](xbox_final_fantasy.md).
 
-## Entrega completada
+## Entrega inicial 0.3.9.1 (histórico)
 
 - Instalador: `build-uwp/package/jadyx.appx` (16.648.541 bytes).
 - Dependencia: `build-uwp/package/Microsoft.VCLibs.x64.14.00.appx`.

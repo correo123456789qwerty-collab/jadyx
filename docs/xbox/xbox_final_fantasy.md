@@ -2,7 +2,8 @@
 
 2 de noviembre de 2026. Rama `feature/series-s-video-stability`.
 El usuario prioriza este juego; Mario Kart y Qliphah quedan para después.
-Hay cambios locales, sin commit, paquete nuevo ni validación de este candidato en Series S.
+Entrega personal 0.3.9.2 completada y verificada; detalles y hash al final.
+La validación de este candidato en Series S sigue pendiente.
 
 ## Evidencia recibida
 
@@ -94,12 +95,12 @@ Los dos gates pasan localmente en build optimizado y con ASan/UBSan. El
 benchmark optimizado del tracker conserva el umbral de coste; se observaron
 2,04 ns adicionales por hit repetido en este host, sin inferir FPS de la Series.
 Se incorporan al workflow reutilizable de regresiones, con el fmt fijado del
-proyecto. Su ejecución remota queda pendiente; no hay commit ni push.
+proyecto. La ejecución remota de Linux y Windows también pasó en el run de entrega.
 
-Pendiente en Windows: build UWP y `tools/xbox/tests/run-network-portal.ps1`,
-incluida comparación PAX del log con escritor abierto. Después preparar un
-paquete distinto de 0.3.9.1 y repetir manualmente la transición del primer
-combate en Series S, exportando los logs. El candidato aún no certifica resolver
+Completados en Windows el build UWP y `tools/xbox/tests/run-network-portal.ps1`,
+incluida comparación PAX del log con escritor abierto. Queda repetir manualmente
+la transición del primer combate en Series S con 0.3.9.2 y exportar sus logs.
+El candidato aún no certifica resolver
 la pantalla negra, el tambaleo, las luces ni mejorar el promedio de FPS.
 
 ## Ampliación de estabilidad antes del instalador 0.3.9.2
@@ -140,5 +141,27 @@ y un fallo hardware de lectura atendido por el VEH instalado.
 
 `run-stability-gates.ps1` se añade al build Windows junto al gate TCP/PAX de
 exportación con escritor abierto. Estos gates nativos y el build UWP se deben
-completar antes de entregar 0.3.9.2. La firma y distribución siguen en el fork
+completaron antes de entregar 0.3.9.2. La firma y distribución siguen en el fork
 personal; sin release pública ni cambios en los repositorios originales.
+
+## Entrega verificada 0.3.9.2
+
+- [CI completa y correcta](https://github.com/correo123456789qwerty-collab/jadyx/actions/runs/41548652658),
+  fuente `f1188e1d2e38a7fe4b2ba5ed83c8c8c83e87595b`, UWP x64 Release con LTO.
+- Instalador vigente: `build-uwp/package/jadyx.appx`, 16.645.555 bytes.
+- SHA256: `4067b06a004fec7427fed2dd4ea298e46da8078842f49cd7c57bc2abe8760c16`.
+- Dependencia VCLibs y certificado público en la misma carpeta. El certificado
+  es el mismo de 0.3.9.1; su SHA256 empieza por `f7d62c65c50459ea`.
+- EXE y PDB archivados en `build-uwp/symbols/0.3.9.2`, byteidénticos al artefacto
+  del compilador; el EXE del APPX coincide con ese mismo build.
+
+Todos los gates de Windows y Linux pasaron, incluyendo el VEH real y el portal
+TCP/PAX con el escritor de logs abierto. Tras descargar el paquete se verificó
+independientemente PKCS#7 con OpenSSL, pin de firma, digests firmados del
+contenedor/metadata, CRC y 772 bloques de 35 payloads. Evidencia privada en
+`test-results/stability-0.3.9.2/installer-verification.json` y `windows-gates.txt`.
+
+La prueba de reempaquetado rápido tarda 72 s sin modificar el EXE; está descrita
+en [xbox_fast_installer.md](xbox_fast_installer.md). No se ha instalado 0.3.9.2 en
+Xbox ni se han medido FPS nuevos; el paso del combate y los errores gráficos
+permanecen como gate manual en la consola.

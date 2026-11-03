@@ -43,7 +43,7 @@ Actions; no se guardan en cachés ni artefactos.
 
 ```bash
 gh workflow run ci.yml --repo correo123456789qwerty-collab/jadyx \
-  --ref feature/fast-installer -f reuse_build_run=RUN_CORRECTO \
+  --ref feature/fast-installer -f reuse_build_run=41548652658 \
   -f package_version=0.3.9.2 -f windows_runner=windows-2025
 ```
 
@@ -55,4 +55,18 @@ Los tests TCP/PAX que requieren las bibliotecas completas siguen después.
 Referencias: [artefactos de workflows](https://docs.github.com/en/actions/tutorials/store-and-share-data),
 [comportamiento de las cachés](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching)
 y [LTCG incremental](https://learn.microsoft.com/en-us/cpp/build/reference/ltcg-link-time-code-generation?view=msvc-170).
-El tiempo real de reempaquetado se registra al completar el gate remoto.
+## Gate remoto de la ruta rápida
+
+[Run 41549119630](https://github.com/correo123456789qwerty-collab/jadyx/actions/runs/41549119630)
+correcto: **67 s en el job Windows y 72 s desde el despacho hasta completarlo**.
+Se reempaquetó 0.3.9.1 desde el build válido 41523693476, sin compilar ni
+ejecutar CMake. El EXE del APPX resultante es byteidéntico al de la entrega
+anterior. OpenSSL verificó de nuevo PKCS#7 y el pin personal; también se
+comprobaron digests firmados, CRC, bloques y modo biblioteca.
+
+La prueba se conserva en `test-results/stability-0.3.9.2/fast-route-proof.json`
+y `fast-proof-verification.json`. Su artefacto de prueba no reemplaza la entrega
+de 0.3.9.2. El tiempo medido corresponde a reempaquetar código ya validado;
+un cambio de código necesita un nuevo build, que luego puede reutilizarse.
+La entrega de código nuevo 0.3.9.2 ya completó su CI 41548652658 con todos los
+gates correctos; el ejemplo anterior reutiliza ese build, no el de la prueba 0.3.9.1.

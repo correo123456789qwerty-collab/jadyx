@@ -4351,3 +4351,31 @@ Primer CI 0.3.9.2 (41542484724): Linux/Mesa pasan; UWP detecta C2064 en el
 exportador. La enumeración usa directory_entry.path(), pero el snapshot Entry
 tiene un campo path: en la segunda apertura debe ser reader.Open(entry.path).
 Corregido; aprovechar la caché guardada para repetir build y gates Windows.
+
+Segundo CI 41546366579: UWP compila, cuatro gates Windows de memoria/tracker pasan.
+Portal alcanza el export correcto pero el test esperaba tres archivos; al añadir
+el escritor vivo hay cuatro. Expectativa corregida. La subida del EXE/PDB pasa
+justo después del link para conservarlo ante un fallo posterior del harness.
+Un preflight compila el exportador y pasa gates de memoria antes del build grande.
+
+Ruta rápida 41549119630 validada: 67 s job/72 s total, reempaquetando el build
+correcto 41523693476. EXE byteidéntico, PKCS7/pin/digests/CRC/bloques correctos;
+sin CMake ni compilación. `ci.yml reuse_build_run` exige fuente CI exitosa,
+SHA explícito y jobs UWP/Mesa correctos. No confundir un reempaquetado con compilar
+código nuevo. Comandos y límites en [xbox_fast_installer.md](xbox_fast_installer.md).
+
+Entrega 0.3.9.2: CI 41548652658 todo correcto, fuente f1188e1, UWP Release/LTO.
+APPX de 16.645.555 bytes en entrega única; SHA256
+4067b06a004fec7427fed2dd4ea298e46da8078842f49cd7c57bc2abe8760c16.
+Mismo certificado personal que .1. Windows: cuatro gates nativos, updater y
+portal TCP/PAX pasan. Linux: vídeo y regresiones con sanitizadores pasan. Tras
+descarga, PKCS7 independiente OpenSSL/pin/digests/CRC/35payloads772bloques
+correctos; EXE/PDB coinciden con el compilador y se archivan en symbols/0.3.9.2.
+Series/FPS/causa del PANIC todavía pendientes de retest manual del usuario.
+
+Trampa de verificación Linux: Authenticode APPX usa PKCS#7 con contenido SEQUENCE;
+`openssl cms -verify` rechaza ese envoltorio, mientras `openssl smime -verify
+-inform DER -binary -noverify` verifica su firma y permite extraer el contenido.
+`-noverify` omite la cadena CA; el firmante se autentica comparando su clave con
+el pin personal explícito, además de comprobar los digests/bloques firmados.
+No interpretar el fallo del parser CMS como una firma APPX inválida.

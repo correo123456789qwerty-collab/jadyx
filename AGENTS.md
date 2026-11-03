@@ -1,5 +1,21 @@
 # AGENTS.md: guía para agentes de IA en Jadyx (fork de JulianDr14)
 
+Entrega personal0.3.9.2 completada: run41548652658 todoPASS, fuente f1188e1,
+UWPx64Release/LTO. APPX en build-uwp/package/jadyx.appx (16645555B), SHA256
+4067b06a004fec7427fed2dd4ea298e46da8078842f49cd7c57bc2abe8760c16.
+Windows yLinux pasan, incluidoVEHreal/exportTCP/PAX/escritorabierto; PKCS7/pin/
+digests/CRC/35payloads772bloques verificados tambiénLinux. Mismocert0.3.9.1;
+EXE/PDBidénticosalbuild en symbols/0.3.9.2. SinpruebaSeries niFPSnuevos.
+Ruta rápida reempaquetado validada67sjob/72stotal; ver xbox_fast_installer.md.
+
+Usuario solicita instaladoresmásrápidos: ruta `ci.yml reuse_build_run=ID`
+implementadaenfeature/fast-installer; exigeCIorigen completo correcto yfirma/pin.
+Gate41549119630 pasa:67sjob/72stotal, EXEbyteidénticoa0.3.9.1 yPKCS7/digests/
+CRC/bloques verificadosLinux. Sinrecompilar; cambiosdecódigo sírequierenbuild.
+PreflightWinantesdelbuild ybinariossubidosantesdetestsTCP. Correcciónharness:
+logsfixtureahora4archivos, no3. Entrega0.3.9.2actual41548652658 completada.
+Detalle docs/xbox/xbox_fast_installer.md; noentregarartefactoprueba0.3.9.1como.2.
+
 Usuarioautoriza desarrolloautónomo/estabilidadgeneral yposteriorinstalador0.3.9.2.
 Se añaden fixesWindowsSparse: desregistro páginas/bytes, intervalossemiabiertos,
 VEHsololecturas/reservasvivas/sinrebajarRW; límite logsRead/Write no mapeados
