@@ -52,7 +52,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - run: python3 tools/xbox/tests/release.py
+      - run: |
+          python3 tools/xbox/tests/release.py
+          python3 tools/xbox/tests/incremental-build-state.py
 
   video:
     if: github.event_name != 'workflow_dispatch' || inputs.reuse_build_run == ''

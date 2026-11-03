@@ -13,9 +13,11 @@ $testLibs = ($testNinja | Where-Object { $_ -match '^  LINK_LIBRARIES = .*video_
 if (!$testIncludes -or !$testLibs) { throw 'Configured includes or libraries missing' }
 $testDir = New-Item -ItemType Directory -Force build-uwp/graphics-frontend-gate
 $testSource = Join-Path (Get-Location) 'tools/xbox/tests/graphics-frontend.cpp'
+$testVmaPath = 'src\jadyx\CMakeFiles\jadyx.dir\app\vma_impl.cpp.obj'
+$testVma = if (Test-Path (Join-Path 'build-uwp' $testVmaPath)) { $testVmaPath } else { '' }
 $testCommands = @('@echo off', ('call "' + $testVs + '\VC\Auxiliary\Build\vcvarsall.bat" x64'),
     'if errorlevel 1 exit /b 1', ('cd /d "' + (Join-Path (Get-Location) 'build-uwp') + '"'),
-    ('cl /nologo /O2 /MD /Gy /std:c++20 /Zc:preprocessor /EHsc /utf-8 /DNOMINMAX /DBOOST_CONTAINER_NO_LIB /DBOOST_CONTAINER_STATIC_LINK ' + $testIncludes + ' "' + $testSource + '" src\jadyx\CMakeFiles\jadyx.dir\app\vma_impl.cpp.obj /Fo:graphics-frontend-gate\ /Fe:graphics-frontend-gate\graphics-frontend.exe /link /OPT:REF /NODEFAULTLIB:libcmt ' + ' d3dcompiler.lib ' + $testLibs))
+    ('cl /nologo /O2 /MD /Gy /std:c++20 /Zc:preprocessor /EHsc /utf-8 /DNOMINMAX /DBOOST_CONTAINER_NO_LIB /DBOOST_CONTAINER_STATIC_LINK ' + $testIncludes + ' "' + $testSource + '" ' + $testVma + ' /Fo:graphics-frontend-gate\ /Fe:graphics-frontend-gate\graphics-frontend.exe /link /OPT:REF /NODEFAULTLIB:libcmt ' + ' d3dcompiler.lib ' + $testLibs))
 if ($SyntaxOnly) {
     $testCommands[-1] = 'cl /nologo /Zs /MD /std:c++20 /Zc:preprocessor /EHsc /utf-8 /DNOMINMAX /DBOOST_CONTAINER_NO_LIB /DBOOST_CONTAINER_STATIC_LINK ' + $testIncludes + ' "' + $testSource + '"'
 }
