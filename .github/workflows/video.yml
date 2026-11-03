@@ -19,7 +19,7 @@ jobs:
       - name: Install video test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++ pkg-config ffmpeg libavcodec-dev libavformat-dev libavutil-dev
+          sudo apt-get install -y g++ pkg-config libboost-dev ffmpeg libavcodec-dev libavformat-dev libavutil-dev
       - name: Build the project's pinned fmt
         run: |
           python3 - <<'PY'
@@ -61,6 +61,12 @@ jobs:
           g++ "${guest_flags[@]}" tools/xbox/tests/fault-log-limiter.cpp \
             -o "$RUNNER_TEMP/fault-log-limiter"
           "$RUNNER_TEMP/fault-log-limiter" | tee test-results/series-s-video/fault-log-limiter.txt
+          g++ "${guest_flags[@]}" tools/xbox/tests/shader-environment-record.cpp \
+            -o "$RUNNER_TEMP/shader-environment-record"
+          "$RUNNER_TEMP/shader-environment-record" | tee test-results/series-s-video/shader-environment-record.txt
+          g++ "${guest_flags[@]}" tools/xbox/tests/linked-shader-cache.cpp \
+            -o "$RUNNER_TEMP/linked-shader-cache"
+          "$RUNNER_TEMP/linked-shader-cache" | tee test-results/series-s-video/linked-shader-cache.txt
       - uses: actions/upload-artifact@v7
         with:
           name: video-decoder-gates
@@ -69,5 +75,7 @@ jobs:
             test-results/series-s-video/guest-page-table-reset.txt
             test-results/series-s-video/guest-diagnostics.txt
             test-results/series-s-video/fault-log-limiter.txt
+            test-results/series-s-video/shader-environment-record.txt
+            test-results/series-s-video/linked-shader-cache.txt
           if-no-files-found: error
           retention-days: 14

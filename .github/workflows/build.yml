@@ -176,14 +176,43 @@ jobs:
           -DUSE_CCACHE=ON -DCCACHE_BINARY=sccache
           -DCMAKE_POLICY_DEFAULT_CMP0141=NEW -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
           -DJADYX_HOST_LTO=${{ inputs.lto && 'ON' || 'OFF' }}
+          -DJADYX_INCREMENTAL_LTCG=${{ inputs.lto && 'ON' || 'OFF' }}
+
+      # The compiler cache saves compilation, not the five-minute whole-program link. MSVC's
+      # incremental LTCG state is toolchain/configuration specific, and never a substitute for
+      # building and testing the current checkout. Ninja must still compile and relink it.
+      - name: Restore optimized link state
+        if: inputs.lto
+        uses: actions/cache/restore@v6
+        id: ltcg
+        with:
+          path: |
+            build-uwp/ltcg
+            build-uwp/bin/*.ipdb
+            build-uwp/bin/jadyx.exe
+            build-uwp/bin/jadyx.pdb
+          key: ltcg-v1-${{ steps.tools.outputs.image }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'CMakeModules/**', 'cpmfile.json', '**/CMakeLists.txt', '**/cpmfile.json', 'tools/xbox/build-env.bat', '.github/workflows/build.yml') }}-${{ github.run_id }}
+          restore-keys: ltcg-v1-${{ steps.tools.outputs.image }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'CMakeModules/**', 'cpmfile.json', '**/CMakeLists.txt', '**/cpmfile.json', 'tools/xbox/build-env.bat', '.github/workflows/build.yml') }}-
 
       - name: Check Windows memory and export source before the full build
         shell: pwsh
         run: tools/xbox/tests/run-stability-gates.ps1 -SkipPortal
 
+      - name: Check graphics frontend source before the full link
+        shell: pwsh
+        run: |
+          & tools/xbox/tests/run-graphics-frontend.ps1 -SyntaxOnly
+          & tools\xbox\build-env.bat ninja -C build-uwp src/video_core/CMakeFiles/video_core.dir/renderer_d3d12/d3d12_pipeline_cache.cpp.obj
+          if ($LASTEXITCODE -ne 0) { throw 'Graphics frontend source failed' }
+
       - name: Build
-        shell: cmd
-        run: tools\xbox\build-env.bat cmake --build --preset uwp-x64 --target jadyx
+        shell: pwsh
+        run: |
+          $buildTimer = [System.Diagnostics.Stopwatch]::StartNew()
+          & tools\xbox\build-env.bat cmake --build --preset uwp-x64 --target jadyx
+          if ($LASTEXITCODE -ne 0) { throw 'UWP build failed' }
+          $buildTimer.Stop()
+          "UWP build: $([math]::Round($buildTimer.Elapsed.TotalSeconds, 1)) s; restored LTCG seed: ${{ steps.ltcg.outputs.cache-matched-key }}" >> $env:GITHUB_STEP_SUMMARY
 
       # Preserve the expensive linked output even if a later test harness fails. Package still
       # needs this entire job to succeed; an uploaded executable alone never bypasses the gates.
@@ -201,6 +230,10 @@ jobs:
         shell: pwsh
         run: tools/xbox/tests/run-updater-gates.ps1
 
+      - name: Test graphics frontend identity and specialization
+        shell: pwsh
+        run: tools/xbox/tests/run-graphics-frontend.ps1
+
       - name: Test memory stability and live log export
         shell: pwsh
         run: tools/xbox/tests/run-network-portal.ps1
@@ -215,6 +248,17 @@ jobs:
           sccache --stop-server
           $fence = '```'
           "### sccache`n$fence`n$($stats -join "`n")`n$fence" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Save optimized link state
+        if: success() && inputs.lto && hashFiles('build-uwp/ltcg/*.iobj') != ''
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            build-uwp/ltcg
+            build-uwp/bin/*.ipdb
+            build-uwp/bin/jadyx.exe
+            build-uwp/bin/jadyx.pdb
+          key: ${{ steps.ltcg.outputs.cache-primary-key }}
 
       # Every run saves what it built. A PR's GitHub caches are visible to that PR alone, so its
       # next push starts warm; main's (Release and manual runs) seed every new PR. The repo keeps

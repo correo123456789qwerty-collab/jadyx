@@ -11,6 +11,7 @@
 # video_core) inline and drops the code nothing reaches.
 
 option(JADYX_HOST_LTO "Link-time optimize the emulator's own libraries in Release" OFF)
+option(JADYX_INCREMENTAL_LTCG "Retain MSVC's optimized link state for subsequent edits" OFF)
 
 function(jadyx_enable_host_lto)
     if (NOT JADYX_HOST_LTO OR ENABLE_LTO)
@@ -35,5 +36,14 @@ function(jadyx_enable_host_lto)
             list(APPEND _lto_targets ${_target})
         endif()
     endforeach()
+    if(JADYX_INCREMENTAL_LTCG AND MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND TARGET jadyx)
+        # This retains whole-program optimization. It is not /INCREMENTAL linking (which is
+        # incompatible with /LTCG). Keep the intermediate object and its .ipdb across builds.
+        # Target options follow CMake's /LTCG IPO default, so INCREMENTAL is the effective mode.
+        file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/ltcg")
+        target_link_options(jadyx PRIVATE
+            "$<$<CONFIG:Release>:/LTCG:INCREMENTAL>"
+            "$<$<CONFIG:Release>:/LTCGOUT:${CMAKE_BINARY_DIR}/ltcg/jadyx.iobj>")
+    endif()
     message(STATUS "JADYX_HOST_LTO: link-time optimizing ${_lto_targets}")
 endfunction()
