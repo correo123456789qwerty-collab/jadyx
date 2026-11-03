@@ -203,13 +203,21 @@ jobs:
 
       - name: Check graphics frontend source before the full link
         shell: pwsh
+        run: tools/xbox/tests/run-graphics-frontend.ps1 -SyntaxOnly
+
+      - name: Build frontend test libraries
+        id: libraries
+        shell: pwsh
         run: |
-          & tools/xbox/tests/run-graphics-frontend.ps1 -SyntaxOnly
-          & tools\xbox\build-env.bat cmake --build --preset uwp-x64 --target core video_core frontend_common input_common network audio_core hid_core
+          & tools\xbox\build-env.bat cmake --build --preset uwp-x64 --target core video_core frontend_common input_common network audio_core hid_core archive_read
           if ($LASTEXITCODE -ne 0) { throw 'Graphics frontend libraries failed' }
-          & tools/xbox/tests/run-graphics-frontend.ps1
+
+      - name: Test graphics frontend identity and specialization
+        shell: pwsh
+        run: tools/xbox/tests/run-graphics-frontend.ps1
 
       - name: Build
+        id: executable
         shell: pwsh
         run: |
           $buildTimer = [System.Diagnostics.Stopwatch]::StartNew()
@@ -233,13 +241,15 @@ jobs:
       # This is a compiler cache, not a release approval. Keep a successful link even when a
       # later test fails; every new checkout is rebuilt and all delivery gates still must pass.
       - name: Snapshot incremental inputs
+        id: snapshot
+        if: always() && steps.libraries.outcome == 'success' && (steps.executable.outcome == 'success' || steps.executable.outcome == 'skipped')
         shell: pwsh
         run: |
           & python tools/xbox/incremental-build-state.py save
           if ($LASTEXITCODE -ne 0) { throw 'Incremental source snapshot failed' }
 
       - name: Save incremental build
-        if: steps.incremental.outputs.cache-hit != 'true'
+        if: always() && steps.snapshot.outcome == 'success' && steps.incremental.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: build-uwp
