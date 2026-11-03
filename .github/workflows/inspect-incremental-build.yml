@@ -1,6 +1,11 @@
 name: Inspect incremental build
 
 on:
+  workflow_call:
+    inputs:
+      cache_key:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       cache_key:

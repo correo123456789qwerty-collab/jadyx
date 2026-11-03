@@ -25,6 +25,10 @@ on:
         description: Repackage a successful CI run without compiling (empty builds current code)
         type: string
         default: ""
+      inspect_cache:
+        description: Inspect a saved compiler tree without building or packaging
+        type: string
+        default: ""
       lto:
         description: Enable the host link-time optimization used by releases
         type: boolean
@@ -42,12 +46,12 @@ permissions:
   actions: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}${{ inputs.inspect_cache != '' && '-inspect' || '' }}
   cancel-in-progress: true
 
 jobs:
   scripts:
-    if: github.event_name != 'workflow_dispatch' || inputs.reuse_build_run == ''
+    if: github.event_name != 'workflow_dispatch' || (inputs.reuse_build_run == '' && inputs.inspect_cache == '')
     name: release scripts
     runs-on: ubuntu-24.04
     steps:
@@ -57,11 +61,11 @@ jobs:
           python3 tools/xbox/tests/incremental-build-state.py
 
   video:
-    if: github.event_name != 'workflow_dispatch' || inputs.reuse_build_run == ''
+    if: github.event_name != 'workflow_dispatch' || (inputs.reuse_build_run == '' && inputs.inspect_cache == '')
     uses: ./.github/workflows/video.yml
 
   build:
-    if: github.event_name != 'workflow_dispatch' || inputs.reuse_build_run == ''
+    if: github.event_name != 'workflow_dispatch' || (inputs.reuse_build_run == '' && inputs.inspect_cache == '')
     uses: ./.github/workflows/build.yml
     with:
       package: ${{ github.event_name == 'workflow_dispatch' && inputs.package }}
@@ -71,10 +75,16 @@ jobs:
     secrets: inherit
 
   repackage:
-    if: github.event_name == 'workflow_dispatch' && inputs.reuse_build_run != ''
+    if: github.event_name == 'workflow_dispatch' && inputs.reuse_build_run != '' && inputs.inspect_cache == ''
     uses: ./.github/workflows/repackage.yml
     with:
       source_run_id: ${{ inputs.reuse_build_run }}
       package_version: ${{ inputs.package_version }}
       windows_runner: ${{ inputs.windows_runner }}
     secrets: inherit
+
+  inspect:
+    if: github.event_name == 'workflow_dispatch' && inputs.inspect_cache != ''
+    uses: ./.github/workflows/inspect-incremental-build.yml
+    with:
+      cache_key: ${{ inputs.inspect_cache }}
