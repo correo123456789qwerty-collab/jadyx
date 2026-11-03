@@ -4379,3 +4379,19 @@ Trampa de verificación Linux: Authenticode APPX usa PKCS#7 con contenido SEQUEN
 `-noverify` omite la cadena CA; el firmante se autentica comparando su clave con
 el pin personal explícito, además de comprobar los digests/bloques firmados.
 No interpretar el fallo del parser CMS como una firma APPX inválida.
+## 2 nov 2026: reporte Series 0.3.9.2 y preparación 0.3.9.3
+
+El usuario supera varios combates/jefe/transiciones, persisten errores gráficos,
+20–30 FPS variables y pausas fuertes con habilidades nuevas; RAM hasta ~4,7 GB.
+Autoriza desarrollo y decisiones autónomas, nueva versión solo con mejoras
+prometedoras y acelerar su generación. Priorizamos trabajo repetido del frontend
+de shaders antes del caché DXIL: memo de preparación por estado de shaders,
+4 MiB/128 entradas, replay/comparación de todas las consultas y cabeceras, fallback
+si cambian inputs; tablas de serialización se rellenan también en hits.
+No omitir draws ni alterar el PSO completo. Record sin referencias guest/IR vivas
+en caché; guard de memoria limpia la caché opcional. Tests de registros Linux O2
+y ASan/UBSan y caché genérico pasan; diferencial Maxwell/Windows y entrega pendientes.
+Se prepara LTCG incremental y semilla de optimizador compatible en Actions, sin
+omitir el build/gates actuales; ahorro con código nuevo aún sin medir.
+Detalles: xbox_final_fantasy.md y xbox_fast_installer.md. No causa gráfica/FPS
+Series demostrados ni instalador sustituido en esta etapa.

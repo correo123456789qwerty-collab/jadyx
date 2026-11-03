@@ -1,5 +1,30 @@
 # Instaladores rápidos sin recompilar un build válido
 
+## Iteraciones con código nuevo: estado LTCG
+
+El candidato 0.3.9.3 añade `JADYX_INCREMENTAL_LTCG` a la configuración MSVC:
+`/LTCG:INCREMENTAL` y `/LTCGOUT:.../ltcg/jadyx.iobj`, conservando `/GL` y las
+optimizaciones Release. Es distinto de `/INCREMENTAL`, incompatible con LTCG.
+CMake usa `/LTCG` completo por defecto: no basta activar IPO para conservar
+el trabajo del optimizador entre enlaces.
+
+Actions guarda `.iobj/.ipdb`, EXE y PDB tras pasar los gates. La clave separa
+imagen/toolchain y todos los archivos de configuración/dependencias del build.
+Cada ejecución usa una clave inmutable distinta y restaura la última compatible.
+Solo es una semilla del optimizador: Ninja sigue compilando y enlazando el
+checkout actual; no se restaura su grafo ni sus timestamps, ni se salta un gate.
+El EXE restaurado nunca se empaqueta si falla la compilación o las pruebas.
+
+La primera ejecución no tiene semilla; la ganancia con una edición posterior
+debe medirse. El workflow escribe duración y clave restaurada en su resumen.
+Se mantienen el firmante/pin y las verificaciones de entrega existentes.
+El preflight nuevo compila primero el objeto del renderer cambiado y comprueba
+la sintaxis del harness, antes del enlace completo.
+
+Fuentes: [Microsoft /LTCG](https://learn.microsoft.com/en-us/cpp/build/reference/ltcg-link-time-code-generation?view=msvc-170),
+[/LTCGOUT](https://learn.microsoft.com/en-us/cpp/build/reference/ltcgout?view=msvc-170),
+[configuración IPO MSVC de CMake](https://github.com/Kitware/CMake/blob/master/Modules/Platform/Windows-MSVC.cmake).
+
 2 de noviembre de 2026. Aplicable al fork personal.
 
 ## Medición del cuello de botella

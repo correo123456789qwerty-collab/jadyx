@@ -1,5 +1,60 @@
 # Final Fantasy Resonance: primera revisión de 0.3.9.1
 
+## Reporte 0.3.9.2 y candidato 0.3.9.3 — 2 nov 2026
+
+El usuario probó desde el principio en Series: menú 30 FPS/~3,7 GB; vídeo inicial
+~21–23 FPS/~4,2 GB; escenas y exploración ~20–30 FPS, parpadeo/tambaleo y texturas
+incorrectas persistentes. Combates normalmente 30 FPS, con caídas hasta 0,1–1 FPS
+al estrenar habilidades o conversión; Bahamut se reproduce con fluidez, Megafulgor
+no llegó a verse. Varios combates/jefe y transiciones terminaron y pudo continuar.
+Memoria comunicada al avanzar: ~4,6–4,7 GB. Son observaciones manuales, no una
+captura con frametimes ni una demostración de que cada pausa sea compilación.
+
+Se prioriza **preparación de shaders**. El código 0.3.9.2 vuelve a ejecutar CFG,
+traducción Maxwell→IR, optimizaciones y emisión SPIR-V para cada clave gráfica
+nueva, aunque únicamente cambien blending/depth/stencil. La caché DXIL posterior
+no ahorra ese trabajo sobre el hilo GPU.
+
+El candidato conserva una caché de preparación separada de la identidad PSO:
+
+- Solo excluye estados que la preparación no lee: depth bias, máscaras stencil,
+  strip cut, dynamic state, attachments y formatos color/depth. Mantiene los
+  inputs de shaders, dual-source blend, alpha test, vertex fetch, topología y XFB.
+- Reproduce y compara **cada consulta original** (incluidas instrucciones,
+  constantes, tipos/formato de textura, viewport y HLE), además de cabecera,
+  etapa y parámetros del entorno. No basta el hash del shader. Una diferencia
+  o consulta ausente obliga a recompilar por la ruta normal.
+- La reproducción rellena las tablas de GenericEnvironment antes de serializar
+  una variante; omitirlo produciría entradas de disco incompletas.
+- Máximo 4 MiB/128 entradas, compartidas durante compilación, sin mutex durante
+  la traducción; se vacía con el guard de memoria ya existente. Los captures
+  liberan referencias al entorno y mapas que contenían punteros IR temporales.
+- El PSO usa siempre su clave completa y los draws siguen esperando su pipeline
+  exacto. No se cambian shaders, precisión, contenido, presupuestos JIT/DRAM ni
+  workers. Los dumps de diagnóstico fuerzan la ruta de traducción normal.
+
+Pruebas: `shader-environment-record.cpp` (mutaciones y replay, Linux optimizado
+y ASan/UBSan pasan); `graphics-frontend.cpp` compara 128 variantes de shaders
+Maxwell sintéticos con traducción directa, SPIR-V/metadata exactos, límites y
+tiempos aislados. Este último se enlaza con las bibliotecas UWP reales en CI;
+su resultado y entrega quedan pendientes al iniciar el candidato. El cache
+genérico pasa localmente colisiones, 16 clientes concurrentes, retry y LRU.
+
+La optimización tiene un mecanismo concreto para reducir trabajo repetido;
+no elimina el primer shader desconocido ni toda creación PSO del driver. No
+certifica aún FPS, corrección de parpadeo/texturas, Megafulgor ni ahorro neto de
+RAM en Series. El instalador solo se sustituye tras pasar build, gates y firma.
+
+Investigación: Microsoft separa bytecode y estado PSO en
+[Pipelines and Shaders](https://learn.microsoft.com/en-us/windows/win32/direct3d12/pipelines-and-shaders-with-directx-12)
+y documenta el coste síncrono de creación en
+[background shader optimizations](https://devblogs.microsoft.com/directx/background-shader-optimizations/).
+Las bibliotecas PSO/GetCachedBlob no se introducen: el proyecto ya documenta
+restricciones del driver Series. El objetivo es ahorrar la traducción anterior.
+
+Instaladores: además de la ruta de reempaquetado de 72 s ya medida, se implementa
+retención del estado LTCG optimizado; ver [instaladores rápidos](xbox_fast_installer.md).
+
 2 de noviembre de 2026. Rama `feature/series-s-video-stability`.
 El usuario prioriza este juego; Mario Kart y Qliphah quedan para después.
 Entrega personal 0.3.9.2 completada y verificada; detalles y hash al final.

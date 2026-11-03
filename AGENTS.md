@@ -1,5 +1,15 @@
 # AGENTS.md: guía para agentes de IA en Jadyx (fork de JulianDr14)
 
+ReporteSeries0.3.9.2: varioscombates/jefe/transiciones continúan; persisten20–30FPS,
+parpadeo/tambaleo/texturas ypausas fuertes porhabilidadesnuevas,RAMhasta4,7GB.
+Usuarioautoriza nueva versión prometedora,desarrollo/decisionesautónomas yacelerar
+instalador. Candidato0.3.9.3 priorizafrontendshaders: preparaciónreutilizable4MiB/
+128entradas,PSOcompletointacto,replayexactodeconsultas/cabecerasincluyecódigo y
+repueblaserialización,fallbacksiinputs cambian,guardRAM. RecordLinuxO2/ASan/UBSan
+ycachegenérico pasan; diferencialMaxwellWindows/build/entregapendientes. LTCG
+incremental+semillaActions implementados,ahorroconedicionesaúnpormedir. Detalles
+docs/xbox/xbox_final_fantasy.md yxbox_fast_installer.md. NoFPS/visualSeries nuevos.
+
 Entrega personal0.3.9.2 completada: run41548652658 todoPASS, fuente f1188e1,
 UWPx64Release/LTO. APPX en build-uwp/package/jadyx.appx (16645555B), SHA256
 4067b06a004fec7427fed2dd4ea298e46da8078842f49cd7c57bc2abe8760c16.
