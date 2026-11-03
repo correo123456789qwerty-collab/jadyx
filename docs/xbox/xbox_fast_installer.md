@@ -2,13 +2,38 @@
 
 ## Iteraciones con código nuevo: estado LTCG
 
+El primer run del candidato, 41558482021, confirmó que el problema no es solo
+el enlace: 1.550 hits/17 misses (98,92 %), pero ~8 min recorriendo los objetos y
+bibliotecas y ~6 min 41 s hasta terminar el enlace. El ejecutable compiló; el
+harness falló por exigir `vma_impl.cpp.obj` en un build sin Vulkan. La ruta del
+test ahora es condicional. No se entregó ese artefacto ni se omitió el gate.
+
+Se añade caché del árbol `build-uwp`, con Ninja, objetos, bibliotecas y estado
+LTCG. Antes de configurar se compara SHA256 de cada fuente con un manifiesto
+del build anterior. **Solo los bytes idénticos recuperan su timestamp**; las
+fuentes nuevas/cambiadas se fechan después de todos los outputs cacheados,
+también si conservan tamaño o traen una fecha antigua. No se sustituyen fuentes.
+La clave fija imagen/toolchain, LTO, configuración, dependencias y el script;
+el manifiesto exige el mismo workspace y valida su formato/rutas antes de actuar.
+CMake y Ninja siguen configurando, comprobando dependencias y construyendo.
+
+La prueba local con g++/make pasa: checkout sin cambios no recompila; header del
+mismo tamaño con timestamp antiguo recompila y cambia el resultado 21→42;
+entrada nueva y manifiestos con workspace/formato/rutas inválidos se detectan.
+La prueba remota con Ninja/MSVC y el ahorro efectivo siguen pendientes.
+
+La caché de compilación se guarda tras enlazar, antes de los tests posteriores.
+Es material de compilador, como sccache; no aprueba un instalador. El empaquetado
+sigue exigiendo todos los gates. La prueba de frontend ahora se ejecuta tras
+compilar las bibliotecas, **antes del enlace del emulador**, para fallar antes.
+
 El candidato 0.3.9.3 añade `JADYX_INCREMENTAL_LTCG` a la configuración MSVC:
 `/LTCG:INCREMENTAL` y `/LTCGOUT:.../ltcg/jadyx.iobj`, conservando `/GL` y las
 optimizaciones Release. Es distinto de `/INCREMENTAL`, incompatible con LTCG.
 CMake usa `/LTCG` completo por defecto: no basta activar IPO para conservar
 el trabajo del optimizador entre enlaces.
 
-Actions guarda `.iobj/.ipdb`, EXE y PDB tras pasar los gates. La clave separa
+Actions guarda `.iobj/.ipdb`, EXE y PDB con el árbol tras enlazar. La clave separa
 imagen/toolchain y todos los archivos de configuración/dependencias del build.
 Cada ejecución usa una clave inmutable distinta y restaura la última compatible.
 Solo es una semilla del optimizador: Ninja sigue compilando y enlazando el
@@ -48,8 +73,8 @@ de enlazarlo; el empaquetado normal sigue exigiendo que todos los gates pasen.
 | Reempaquetar un build correcto | Cambiar versión o repetir firma/entrega del mismo código | Implementado, sin compilador ni configuración CMake |
 | Preflight Windows | Detectar fallos de los módulos modificados antes del build grande | Implementado: exportador y cuatro gates nativos |
 | Windows persistente + Ninja incremental | Iteraciones que sí cambian código | Preferible para desarrollo local; aquí no hay un equipo Windows configurado |
-| Árbol de build en caché | Reutilizar objetos, bibliotecas y estado del enlace entre runners | Requiere validar toolchain, rutas y timestamps; no habilitado como una caché ciega |
-| LTO incremental | Reducir trabajo del enlace al cambiar código | Microsoft lo soporta; requiere conservar .iobj/.ipdb y medir con este emulador |
+| Árbol de build en caché | Reutilizar objetos, bibliotecas y estado del enlace entre runners | Candidato implementado con manifiesto de contenido/rutas; gate MSVC y medición pendientes |
+| LTO incremental | Reducir trabajo del enlace al cambiar código | Implementado con .iobj/.ipdb dentro del árbol; medición pendiente |
 
 Esta entrega conserva el perfil UWP Release con LTO. Las rutas rápidas no
 prometen conservar binarios cuando cambia el código: reempaquetar reproduce

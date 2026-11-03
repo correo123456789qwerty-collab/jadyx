@@ -1,5 +1,12 @@
 # AGENTS.md: guía para agentes de IA en Jadyx (fork de JulianDr14)
 
+0.3.9.3 CIinicial41558482021: Linux/Mesa/buildUWP pasan; harnessexigeVMAobj
+ausenteconVulkanOFF,corregidocondicional ygate movidoantesdeenlaceEXE. Noentrega.
+LTOsolo noevita8minreplay de1550hits/17misses más6m41enlace. Se implementaárbol
+Ninjacacheado+SHA256inputs/mismoworkspace/timestampssolobytesidénticos;
+cambiadosdespuéstodosoutputs. g++/make realpasa no-op/headermismotamaño21→42/
+fechaantigua/nuevos/manifiestoinválido. MSVCcaliente/FPScandidatos pendientes.
+
 ReporteSeries0.3.9.2: varioscombates/jefe/transiciones continúan; persisten20–30FPS,
 parpadeo/tambaleo/texturas ypausas fuertes porhabilidadesnuevas,RAMhasta4,7GB.
 Usuarioautoriza nueva versión prometedora,desarrollo/decisionesautónomas yacelerar
