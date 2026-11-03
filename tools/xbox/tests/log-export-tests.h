@@ -74,7 +74,12 @@ void LogExportTests(Jadyx::NetworkPortal& portal,httplib::Client& client,
     const bool streaming=early_grant.at("streaming").get<bool>();
     auto streamed=client.Get(early_grant.at("download").get<std::string>());
     Check(Status(streamed)==200,"download followed from the start of the export");
-    Check(!streaming||streamed->get_header_value("Transfer-Encoding")=="chunked","streamed while compressing");
+    const bool chunked=streamed->get_header_value("Transfer-Encoding")=="chunked";
+    // The worker may finish between granting the URL and GET: a complete immutable response
+    // then has a fixed length and validator. Both transports must return the same archive.
+    const auto completed_length=streamed->get_header_value("Content-Length");
+    Check(chunked||(!completed_length.empty()&&!streamed->get_header_value("ETag").empty()&&
+          std::stoull(completed_length)==streamed->body.size()),"live chunks or completed archive with exact length");
     auto state=wait();
     if(state.at("phase")!="ready")std::fprintf(stderr,"logs: %s\n",state.dump().c_str());
     Check(state.at("phase")=="ready"&&state.at("files")==4,"all log files prepared including live writer");
@@ -109,5 +114,5 @@ void LogExportTests(Jadyx::NetworkPortal& portal,httplib::Client& client,
     Check(!std::filesystem::exists(root/"transfers"/"log-export"/"logs.partial"),"cancelled partial removed");
     Check(Status(client.Post("/api/v1/logs/export",authenticated,"{}","application/json"))==202,"restart after cancellation");
     Check(wait().at("phase")=="ready","restart completes");
-    std::printf("PASS: logs native TCP export, streaming while compressing (%s), range/retry, cancellation, bounded buffers; fixture %s\n",streaming?"yes":"already ready",root.string().c_str());
+    std::printf("PASS: logs native TCP export, streaming announced (%s), transport (%s), range/retry, cancellation, bounded buffers; fixture %s\n",streaming?"yes":"already ready",chunked?"chunked":"completed",root.string().c_str());
 }
