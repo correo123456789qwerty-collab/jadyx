@@ -11,7 +11,7 @@
 
 namespace D3D12 {
 
-/// Remove only PSO inputs never read by shader preparation or MakeRuntimeInfo. Preserve every
+/// Remove pipeline inputs never read by SPIR-V preparation or MakeRuntimeInfo. Preserve every
 /// shader input, including dual-source blending, vertex fetch layout, topology, XFB and alpha
 /// test. This is a separate key: the actual PSO always uses the full, original pipeline key.
 template <class Key>
@@ -25,6 +25,9 @@ std::vector<u32> MakeGraphicsShaderKey(Key key) {
     key.stencil_read_mask = 0;
     key.stencil_write_mask = 0;
     key.strip_cut = 0;
+    // Reduction is lowered by Mesa at DXIL linking, after this cached SPIR-V preparation.
+    // The original key still selects its own root signature, linked DXIL and PSO.
+    key.emulate_reduction = 0;
     key.state.dynamic_state = {};
     key.state.attachments = {};
     key.state.color_formats = {};

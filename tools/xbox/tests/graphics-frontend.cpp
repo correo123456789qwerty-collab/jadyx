@@ -91,6 +91,7 @@ int main() try {
         variant.stencil_read_mask = static_cast<u8>(i);
         variant.stencil_write_mask = static_cast<u8>(i + 1);
         variant.strip_cut = static_cast<u8>(i % 3);
+        variant.emulate_reduction = static_cast<u8>(i & 1);
         variant.state.dynamic_state.raw1 = i;
         variant.state.dynamic_state.raw2 = i << 16;
         variant.state.attachments[0].raw = i * 17;
