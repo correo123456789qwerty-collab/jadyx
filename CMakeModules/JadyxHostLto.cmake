@@ -39,7 +39,12 @@ function(jadyx_enable_host_lto)
     if(JADYX_INCREMENTAL_LTCG AND MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND TARGET jadyx)
         # This retains whole-program optimization. It is not /INCREMENTAL linking (which is
         # incompatible with /LTCG). Keep the intermediate object and its .ipdb across builds.
-        # Target options follow CMake's /LTCG IPO default, so INCREMENTAL is the effective mode.
+        # CMake appends its IPO /LTCG AFTER target_link_options, overriding INCREMENTAL.
+        # Keep explicit /GL on this executable, and leave IPO on every library, but provide
+        # its optimized link mode ourselves so there is no later /LTCG to override it.
+        set_property(TARGET jadyx PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF)
+        target_compile_options(jadyx PRIVATE
+            "$<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:CXX>>:/GL>")
         file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/ltcg")
         target_link_options(jadyx PRIVATE
             "$<$<CONFIG:Release>:/LTCG:INCREMENTAL>"

@@ -25,6 +25,10 @@ on:
         description: Windows compiler image for the build and package jobs
         type: string
         default: windows-2025
+      seed_build_cache:
+        description: Explicit compatible tree for a controlled link-configuration migration
+        type: string
+        default: ""
     secrets:
       JADYX_PFX_BASE64:
         required: false
@@ -114,13 +118,26 @@ jobs:
       # Keep Ninja's graph, objects, libraries and optimized link state together. The key pins
       # the image/toolchain and all build inputs outside source files. Source contents are
       # checked independently before any old checkout timestamp is restored.
+      - name: Validate explicit compiler tree migration
+        if: inputs.seed_build_cache != ''
+        shell: pwsh
+        env:
+          BUILD_SEED_KEY: ${{ inputs.seed_build_cache }}
+        run: |
+          $prefix = 'uwp-tree-v1-${{ inputs.lto }}-${{ steps.tools.outputs.image }}-'
+          if (!$env:BUILD_SEED_KEY.StartsWith($prefix, [System.StringComparison]::Ordinal)) {
+              throw 'Explicit build seed must use the same image/compiler, architecture and LTO mode'
+          }
+
       - name: Restore incremental build
         id: incremental
         uses: actions/cache/restore@v6
         with:
           path: build-uwp
           key: uwp-tree-v1-${{ inputs.lto }}-${{ steps.tools.outputs.image }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'CMakeModules/**', 'cpmfile.json', 'src/**/CMakeLists.txt', 'externals/**/CMakeLists.txt', 'externals/**/cpmfile.json', 'tools/xbox/build-env.bat', 'tools/xbox/incremental-build-state.py', '.github/workflows/build.yml') }}-${{ github.run_id }}
-          restore-keys: uwp-tree-v1-${{ inputs.lto }}-${{ steps.tools.outputs.image }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'CMakeModules/**', 'cpmfile.json', 'src/**/CMakeLists.txt', 'externals/**/CMakeLists.txt', 'externals/**/cpmfile.json', 'tools/xbox/build-env.bat', 'tools/xbox/incremental-build-state.py', '.github/workflows/build.yml') }}-
+          restore-keys: |
+            uwp-tree-v1-${{ inputs.lto }}-${{ steps.tools.outputs.image }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'CMakeModules/**', 'cpmfile.json', 'src/**/CMakeLists.txt', 'externals/**/CMakeLists.txt', 'externals/**/cpmfile.json', 'tools/xbox/build-env.bat', 'tools/xbox/incremental-build-state.py', '.github/workflows/build.yml') }}-
+            ${{ inputs.seed_build_cache }}
 
       - name: Validate incremental inputs
         if: steps.incremental.outputs.cache-matched-key != ''
@@ -214,7 +231,7 @@ jobs:
 
       - name: Test graphics frontend identity and specialization
         shell: pwsh
-        run: tools/xbox/tests/run-graphics-frontend.ps1
+        run: tools/xbox/tests/run-graphics-frontend.ps1 -MeasureIncrementalLink
 
       - name: Build
         id: executable

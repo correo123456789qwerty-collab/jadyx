@@ -29,6 +29,10 @@ on:
         description: Inspect a saved compiler tree without building or packaging
         type: string
         default: ""
+      seed_build_cache:
+        description: Explicit compatible compiler-tree seed for a controlled configuration migration
+        type: string
+        default: ""
       lto:
         description: Enable the host link-time optimization used by releases
         type: boolean
@@ -72,6 +76,7 @@ jobs:
       package_version: ${{ github.event_name == 'workflow_dispatch' && inputs.package_version || '' }}
       lto: ${{ github.event_name == 'workflow_dispatch' && inputs.lto }}
       windows_runner: ${{ github.event_name == 'workflow_dispatch' && inputs.windows_runner || 'windows-2025' }}
+      seed_build_cache: ${{ github.event_name == 'workflow_dispatch' && inputs.seed_build_cache || '' }}
     secrets: inherit
 
   repackage:
