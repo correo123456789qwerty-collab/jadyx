@@ -37,6 +37,7 @@
 #include "video_core/renderer_d3d12/d3d12_local_memory_scratch.h"
 #include "video_core/renderer_d3d12/d3d12_maxwell_to_d3d12.h"
 #include "video_core/renderer_d3d12/d3d12_pipeline_cache.h"
+#include "video_core/renderer_d3d12/d3d12_graphics_shader_key.h"
 #include "video_core/renderer_d3d12/d3d12_pipeline_stats.h"
 #include "video_core/renderer_d3d12/d3d12_dxil_disk_cache.h"
 #include "video_core/renderer_d3d12/d3d12_scheduler.h"
@@ -630,6 +631,32 @@ void PipelineCache::TickPrewarm(const CacheMemorySnapshot& snapshot) {
     }
 }
 
+size_t PreparedGraphicsShaders::SizeBytes() const {
+    size_t bytes = sizeof(*this) + stage_indices.capacity() * sizeof(size_t) +
+                   environments.capacity() * sizeof(environments[0]);
+    for (size_t i = 0; i < spirv.size(); ++i) {
+        bytes += spirv[i].capacity() * sizeof(u32);
+        if (!infos[i]) continue;
+        const auto& info = *infos[i];
+        // Count even inline descriptor capacities: conservative accounting of the optional cache.
+        bytes += sizeof(info) +
+            info.texture_buffer_descriptors.capacity() * sizeof(Shader::TextureBufferDescriptor) +
+            info.image_buffer_descriptors.capacity() * sizeof(Shader::ImageBufferDescriptor) +
+            info.texture_descriptors.capacity() * sizeof(Shader::TextureDescriptor) +
+            info.image_descriptors.capacity() * sizeof(Shader::ImageDescriptor);
+    }
+    for (const auto& environment : environments) bytes += environment->SizeBytes();
+    return bytes;
+}
+
+bool PreparedGraphicsShaders::Matches(std::span<Shader::Environment* const> envs) const {
+    if (envs.size() != environments.size()) return false;
+    for (size_t i = 0; i < envs.size(); ++i) {
+        if (!environments[i]->Matches(*envs[i])) return false;
+    }
+    return true;
+}
+
 void PipelineCache::LogPipelineStats(std::string_view when) const {
     const PipelineStats& stats = GetPipelineStats();
     const auto ms = [](u64 us) { return static_cast<double>(us) / 1000.0; };
@@ -662,6 +689,11 @@ void PipelineCache::LogPipelineStats(std::string_view when) const {
              when, stats.inline_builds.load(std::memory_order_relaxed),
              stats.prewarm_queued.load(std::memory_order_relaxed),
              stats.prewarm_hits.load(std::memory_order_relaxed), line);
+    LOG_INFO(Render, "D3D12 graphics frontend ({}): {} translations, {} exact reuses, "
+                     "{} specialization rejections; {} bytes retained (4 MiB cap)",
+             when, frontend_misses.load(std::memory_order_relaxed),
+             frontend_hits.load(std::memory_order_relaxed),
+             frontend_rejected.load(std::memory_order_relaxed), prepared_shaders.RetainedBytes());
     LogDxilDigestChecks();
     LogTranslatorPhases(when);
 }
@@ -1077,9 +1109,20 @@ void LogShaderSources(std::span<Shader::Environment* const> envs) {
 }
 } // namespace
 
-std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
+PreparedGraphicsShaders PrepareGraphicsShaders(
     ShaderPools& pools, const GraphicsPipelineCacheKey& key,
-    std::span<Shader::Environment* const> envs, bool build_in_parallel, bool build_pso) try {
+    std::span<Shader::Environment* const> envs, const Shader::Profile& profile,
+    const Shader::HostTranslateInfo& host_info, bool supports_stream_output, bool record_inputs) {
+    PreparedGraphicsShaders prepared;
+    std::vector<Shader::Environment*> recorded_envs;
+    if (record_inputs) {
+        for (auto* env : envs) {
+            auto record = std::make_unique<ShaderEnvironmentRecord>(*env);
+            recorded_envs.push_back(record.get());
+            prepared.environments.push_back(std::move(record));
+        }
+        envs = recorded_envs;
+    }
     size_t env_index{0};
     std::array<Shader::IR::Program, Maxwell::MaxShaderProgram> programs;
     const bool uses_vertex_a{key.unique_hashes[0] != 0};
@@ -1134,9 +1177,8 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
         }
     }
 
-    std::array<const Shader::Info*, Maxwell::MaxShaderStage> infos{};
-    std::array<std::vector<u32>, Maxwell::MaxShaderStage> spirv;
-    boost::container::static_vector<size_t, Maxwell::MaxShaderStage> stage_indices;
+    auto& spirv = prepared.spirv;
+    auto& stage_indices = prepared.stage_indices;
 
     // Transform feedback is captured where Maxwell captures it, after the last pre-rasterization
     // stage: through stream output, in primitive order, with the counters carrying the buffer
@@ -1148,7 +1190,7 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
                                : key.unique_hashes[3] != 0 ? 3
                                                            : 1;
     const bool captures_xfb{key.state.xfb_enabled != 0};
-    const bool native_xfb{captures_xfb && compiler.SupportsStreamOutput() &&
+    const bool native_xfb{captures_xfb && supports_stream_output &&
                           !transform_feedback_storage.load(std::memory_order_relaxed)};
     VideoCommon::TransformFeedbackVaryings xfb_varyings;
     if (captures_xfb) {
@@ -1203,11 +1245,10 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
             BUG_TRACK(Unimplemented, "VertexA without VertexB (VS A {:016x})", key.unique_hashes[0]);
             const Common::BugTracker::TapMute bug_tracker_mute;
             LOG_ERROR(Render, "D3D12: VertexA without VertexB is not implemented");
-            return nullptr;
+            throw Shader::LogicError("VertexA without VertexB is not implemented");
         }
         Shader::IR::Program& program{programs[index]};
         const size_t stage_index{index - 1};
-        infos[stage_index] = &program.info;
 
         auto runtime_info{MakeRuntimeInfo(programs, key, program, previous_stage)};
         runtime_info.lower_noperspective_mask = lower_noperspective_mask;
@@ -1242,9 +1283,55 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
         if (IsDumpedShader(key.unique_hashes[index])) [[unlikely]] {
             DumpShader(key.unique_hashes[index], stage_index, program, spirv[stage_index]);
         }
+        prepared.infos[stage_index] = std::make_unique<Shader::Info>(program.info);
         stage_indices.push_back(stage_index);
         previous_stage = &program;
     }
+    prepared.fragment_helpers = fragment_helpers;
+    prepared.lower_noperspective_mask = lower_noperspective_mask;
+    prepared.native_xfb = native_xfb;
+    for (auto& environment : prepared.environments) {
+        environment->Detach();
+    }
+    return prepared;
+}
+
+std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
+    ShaderPools& pools, const GraphicsPipelineCacheKey& key,
+    std::span<Shader::Environment* const> envs, bool build_in_parallel, bool build_pso) try {
+    const bool dumps_dxil = IsDumpedShader(key.unique_hashes[1]) ||
+                            IsDumpedShader(key.unique_hashes[5]);
+    const bool diagnostics = Settings::values.dump_guest_shaders ||
+        std::ranges::any_of(key.unique_hashes, IsDumpedShader);
+    const auto prepare = [&] {
+        return PrepareGraphicsShaders(pools, key, envs, profile, host_info,
+                                      compiler.SupportsStreamOutput());
+    };
+    std::shared_ptr<const PreparedGraphicsShaders> prepared;
+    if (diagnostics) {
+        prepared = std::make_shared<const PreparedGraphicsShaders>(prepare());
+        frontend_misses.fetch_add(1, std::memory_order_relaxed);
+    } else {
+        const auto cached = prepared_shaders.Get(MakeGraphicsShaderKey(key), [&] {
+            frontend_misses.fetch_add(1, std::memory_order_relaxed);
+            return prepare();
+        }, [](const PreparedGraphicsShaders& value) { return value.SizeBytes(); });
+        using Outcome = decltype(prepared_shaders)::Outcome;
+        const bool reused = cached.outcome == Outcome::Hit ||
+                            cached.outcome == Outcome::SharedInFlight;
+        if (reused && !cached.value->Matches(envs)) {
+            frontend_rejected.fetch_add(1, std::memory_order_relaxed);
+            frontend_misses.fetch_add(1, std::memory_order_relaxed);
+            prepared = std::make_shared<const PreparedGraphicsShaders>(prepare());
+        } else {
+            if (reused) frontend_hits.fetch_add(1, std::memory_order_relaxed);
+            prepared = cached.value;
+        }
+    }
+    std::array<const Shader::Info*, Maxwell::MaxShaderStage> infos{};
+    for (size_t i = 0; i < infos.size(); ++i) infos[i] = prepared->infos[i].get();
+    const bool native_xfb = prepared->native_xfb;
+    const auto lower_noperspective_mask = prepared->lower_noperspective_mask;
     // Disk-cache keys may carry the bit from a session whose DLL emulated reduction.
     const bool emulate_reduction = key.emulate_reduction != 0 && compiler.EmulatesReduction();
     const PipelineLayout& layout =
@@ -1253,11 +1340,13 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
     // SPIR-V to DXIL goes with the PSO build, on a worker: done here it stalled the GPU thread for
     // 150-490 ms per 300 frames when entering new areas (0.2.59 profile). Translating the guest
     // shaders stays here, since it reads guest memory through the environments.
-    auto compile_dxil = [this, spirv = std::move(spirv), stage_indices, dumps_dxil,
+    auto compile_dxil = [this, prepared, dumps_dxil,
                          vertex_shader = key.unique_hashes[1],
                          fragment_shader = key.unique_hashes[5],
                          pipeline_key = key.Hash(), native_xfb,
                          emulate_reduction](u64 trace_pipeline, bool flatten_vertex) {
+        const auto& stage_indices = prepared->stage_indices;
+        const auto& spirv = prepared->spirv;
         boost::container::static_vector<ShaderCompiler::PipelineStage, Maxwell::MaxShaderStage>
             stages;
         for (const size_t stage_index : stage_indices) {
@@ -1333,7 +1422,7 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
                                                        thread_worker, key, std::move(compile_dxil),
                                                        infos, layout, build_pso, &graphics_psos,
                                                        lower_noperspective_mask);
-    pipeline->SetFragmentHelpers(fragment_helpers);
+    pipeline->SetFragmentHelpers(prepared->fragment_helpers);
     return pipeline;
 
 } catch (const Shader::Exception& exception) {

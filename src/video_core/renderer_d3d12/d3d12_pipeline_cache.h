@@ -4,6 +4,7 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <filesystem>
 #include <memory>
 #include <span>
@@ -30,6 +31,7 @@
 #include "video_core/renderer_d3d12/d3d12_pipeline_key_tracking.h"
 #include "video_core/renderer_d3d12/d3d12_pipeline_residency.h"
 #include "video_core/renderer_d3d12/d3d12_root_signature.h"
+#include "video_core/renderer_d3d12/d3d12_shader_environment_record.h"
 #include "video_core/renderer_vulkan/fixed_pipeline_state.h"
 #include "video_core/shader_cache.h"
 
@@ -105,6 +107,26 @@ struct ChargedDxilStages {
     Common::MemoryCharge charge;
 };
 
+struct PreparedGraphicsShaders {
+    std::array<std::vector<u32>, Maxwell::MaxShaderStage> spirv;
+    std::array<std::unique_ptr<Shader::Info>, Maxwell::MaxShaderStage> infos;
+    std::vector<size_t> stage_indices;
+    std::vector<std::unique_ptr<ShaderEnvironmentRecord>> environments;
+    GraphicsPipeline::FragmentHelpers fragment_helpers{};
+    u32 lower_noperspective_mask{};
+    bool native_xfb{};
+
+    size_t SizeBytes() const;
+    bool Matches(std::span<Shader::Environment* const> envs) const;
+};
+
+/// Shared by the runtime and the differential frontend gate; no D3D device or driver calls.
+PreparedGraphicsShaders PrepareGraphicsShaders(
+    ShaderPools& pools, const GraphicsPipelineCacheKey& key,
+    std::span<Shader::Environment* const> envs, const Shader::Profile& profile,
+    const Shader::HostTranslateInfo& host_info, bool supports_stream_output,
+    bool record_inputs = true);
+
 /// Guest shaders -> D3D12 pipelines, modeled on Vulkan::PipelineCache.
 ///
 /// Maxwell code goes through the shared recompiler to SPIR-V (one binding counter across the
@@ -126,9 +148,11 @@ public:
         switch (linked_shaders_gate.Update(snapshot.app_used, snapshot.app_limit)) {
         case OptionalCacheGate::Action::Trim:
             linked_shaders.SetBudget(0);
+            prepared_shaders.SetBudget(0);
             break;
         case OptionalCacheGate::Action::Restore:
             linked_shaders.SetBudget(decltype(linked_shaders)::DEFAULT_BUDGET);
+            prepared_shaders.SetBudget(decltype(prepared_shaders)::DEFAULT_BUDGET);
             break;
         case OptionalCacheGate::Action::None:
             break;
@@ -242,6 +266,10 @@ private:
     std::filesystem::path pipeline_cache_filename;
 
     LinkedShaderCache<ChargedDxilStages> linked_shaders;
+    LinkedShaderCache<PreparedGraphicsShaders> prepared_shaders;
+    std::atomic<u64> frontend_hits{};
+    std::atomic<u64> frontend_misses{};
+    std::atomic<u64> frontend_rejected{};
     OptionalCacheGate linked_shaders_gate;
 
     // Residency, GPU thread only once the disk cache is loaded.
