@@ -140,7 +140,7 @@ reutilización de una dirección liberada, 1.000 ciclos sin crecimiento del regi
 y un fallo hardware de lectura atendido por el VEH instalado.
 
 `run-stability-gates.ps1` se añade al build Windows junto al gate TCP/PAX de
-exportación con escritor abierto. Estos gates nativos y el build UWP se deben
+exportación con escritor abierto. Estos gates nativos y el build UWP se
 completaron antes de entregar 0.3.9.2. La firma y distribución siguen en el fork
 personal; sin release pública ni cambios en los repositorios originales.
 
